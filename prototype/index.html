@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>同道 · 原型预览</title>
+<style>
+:root{
+  --bg:#f4f2ec; --card:#fff; --ink:#1f2a24; --sub:#6d7a72; --line:#e6e2d8;
+  --brand:#2f6b4f; --brand-soft:#e3efe8; --warn:#b4532a; --warn-soft:#f8e9e1;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#d9d6cc;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:var(--ink)}
+#app{position:relative;max-width:430px;height:100%;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+input,textarea{font:inherit;color:inherit;border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;background:#fff;outline:none}
+input:focus,textarea:focus{border-color:var(--brand)}
+textarea{resize:none}
+.screen{flex:1;overflow-y:auto;padding:16px 16px 24px}
+.pad{padding:28px 24px}
+h1{font-size:26px;margin:0 0 8px} h2{font-size:19px;margin:0} h3{font-size:16px;margin:0}
+.sub{color:var(--sub);font-size:13px;line-height:1.6}
+.btn{display:block;width:100%;padding:14px;border-radius:14px;background:var(--brand);color:#fff;font-weight:600;text-align:center}
+.btn[disabled]{opacity:.4}
+.btn.ghost{background:var(--brand-soft);color:var(--brand)}
+.btn.small{display:inline-block;width:auto;padding:7px 14px;border-radius:10px;font-size:13px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.top{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)}
+.tabs{display:flex;background:#fff;border-top:1px solid var(--line);padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+.tabs button{flex:1;font-size:11px;color:var(--sub);display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabs button i{font-style:normal;font-size:20px;line-height:24px}
+.tabs button.on{color:var(--brand);font-weight:600}
+.tabs button.ai i{background:var(--brand);color:#fff;width:40px;height:40px;line-height:40px;border-radius:50%;margin-top:-18px;box-shadow:0 4px 10px rgba(47,107,79,.35)}
+.notice{background:var(--brand-soft);border-radius:12px;padding:12px;font-size:13px;line-height:1.6;color:#27503d}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;margin:14px 0}
+.check input{width:18px;height:18px;margin-top:1px;flex:none;padding:0}
+.opt{display:block;width:100%;text-align:left;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:10px;line-height:1.5}
+.opt.on{border-color:var(--brand);background:var(--brand-soft)}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:22px}
+.bar b{display:block;height:100%;background:var(--brand);transition:width .3s}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:var(--brand-soft);color:var(--brand)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .card{margin:0;min-height:120px;position:relative}
+.grid .wide{grid-column:span 2}
+.w-title{font-size:13px;color:var(--sub);margin-bottom:8px}
+.big{font-size:28px;font-weight:700}
+.edit-tools{position:absolute;top:6px;right:6px;display:flex;gap:4px}
+.edit-tools button{width:26px;height:26px;border-radius:50%;background:#f0ede4;font-size:13px}
+.edit-tools .del{background:var(--warn-soft);color:var(--warn)}
+.todo{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:14px}
+.todo.done span{text-decoration:line-through;color:var(--sub)}
+.todo input{width:18px;height:18px;padding:0;flex:none}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.post p{margin:10px 0;line-height:1.65;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.post .acts{display:flex;gap:18px;color:var(--sub);font-size:13px}
+.cmt{background:#f7f5ef;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px;line-height:1.5}
+.chat{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:84%;padding:10px 13px;border-radius:16px;line-height:1.6;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#fff;border-bottom-left-radius:4px}
+.composer{display:flex;gap:8px;padding:10px 12px;background:#fff;border-top:1px solid var(--line)}
+.composer input{border-radius:20px}
+.composer button{flex:none;width:44px;height:44px;border-radius:50%;background:var(--brand);color:#fff;font-size:18px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.chips button{flex:none;font-size:13px;padding:7px 12px;border-radius:16px;background:#fff;border:1px solid var(--line)}
+.wb{display:flex;gap:12px;align-items:center}
+.wb .ico{width:48px;height:48px;border-radius:14px;background:var(--brand-soft);font-size:24px;display:flex;align-items:center;justify-content:center;flex:none}
+.step{display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-size:14px}
+.step b{width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none}
+.sheet-mask{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;z-index:20}
+.sheet{background:var(--bg);width:100%;max-height:82%;overflow-y:auto;border-radius:20px 20px 0 0;padding:18px 16px 28px}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);font-size:15px}
+.list-item:last-child{border:0}
+.demo-btn{position:absolute;right:0;top:42%;z-index:30;font-size:11px;padding:7px 8px;border-radius:10px 0 0 10px;background:#1f2a24;color:#fff;opacity:.75}
+.dim{margin:10px 0}
+.dim .bar{margin:4px 0 0;height:6px}
+.log{font-size:12px;line-height:1.7;border-bottom:1px dashed var(--line);padding:6px 0}
+.plus{color:var(--brand)} .minus{color:var(--warn)}
+.center{text-align:center}
+.spin{width:44px;height:44px;border:4px solid var(--brand-soft);border-top-color:var(--brand);border-radius:50%;margin:0 auto 20px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ============ 原型说明 ============
+   纯前端演示：所有"AI 评估"都是本地关键词规则模拟，正式版由后端大模型完成。
+   右上角"演示"按钮展示的隐藏画像仅供产品方查看，真实用户端不存在该入口。 */
+const PASS_LINE = 50;
+const KEY = 'tongdao_proto_v1';
+
+const QUIZ = [
+  {type:'choice', q:'你发现一位平时很照顾你的同事，在报销单里多报了 200 元。你会？',
+   opts:[['装作没看见，不关我的事',1],['私下提醒他改正',4],['直接向上级反映',3],['既然没人查，我下次也多报一点',0]]},
+  {type:'choice', q:'你在网上看到一条让人很气愤的消息，但没有任何来源。你会？',
+   opts:[['立刻转发，让更多人知道',0],['先查证，确认后再决定是否转发',4],['转发并注明"不确定真假"',2],['与我无关，划走',2]]},
+  {type:'choice', q:'你要卖掉一部二手手机，屏幕有一处买家很难发现的暗伤。你会？',
+   opts:[['不提，对方没发现就算了',0],['主动说明，并适当让价',4],['对方问到再说',2],['只写"成色如图"',1]]},
+  {type:'open', q:'辩论题："善意的谎言"违背实事求是吗？请写出你的立场和理由。'},
+  {type:'open', q:'讲一件你坚持了原则、但自己因此吃亏的事。现在回头看，你后悔吗？'}
+];
+
+const WIDGETS = {
+  todo:   {name:'待办清单', wide:true,  desc:'记录今天要做的事'},
+  note:   {name:'随手记',   wide:true,  desc:'一块自由书写的便签'},
+  habit:  {name:'习惯打卡', wide:false, desc:'每天点一下，累计天数'},
+  quote:  {name:'每日一句', wide:false, desc:'一句值得想一想的话'},
+  hot:    {name:'社区热帖', wide:true,  desc:'社区里正在讨论什么'},
+  count:  {name:'倒计时',   wide:false, desc:'距离重要日子还有几天'},
+  ledger: {name:'记账',     wide:false, desc:'快速记一笔支出'},
+  wbfast: {name:'工作台入口', wide:false, desc:'一键进入常用工作台'}
+};
+const WIDGET_KEYWORDS = {
+  todo:['待办','任务','清单','todo','计划'], note:['笔记','便签','记录','随手记','备忘'],
+  habit:['打卡','习惯','坚持','早起','运动'], quote:['一句','语录','名言','鸡汤'],
+  hot:['热帖','社区','热门'], count:['倒计时','纪念日','还有几天','考试'],
+  ledger:['记账','花销','支出','账本','花了'], wbfast:['工作台','快捷']
+};
+const BENCHES = [
+  {id:'image', ico:'🎨', name:'图片设计工作台', desc:'海报、商品图、头像', steps:['描述画面与用途','AI 生成 4 张初稿','选一张继续微调','导出成品'], ph:'例：一张中秋节茶叶促销海报，暖色调'},
+  {id:'video', ico:'🎬', name:'视频制作工作台', desc:'脚本、分镜、成片', steps:['输入主题与时长','AI 生成脚本和分镜','逐镜生成画面与配音','合成并导出'], ph:'例：30 秒的新品开箱短视频'},
+  {id:'shop',  ico:'🛒', name:'电商运营工作台', desc:'标题、详情页、客服话术', steps:['填写商品信息','AI 生成标题与卖点','生成详情页文案与主图建议','生成客服常见问答'], ph:'例：手工陶瓷马克杯，定价 68 元'},
+  {id:'copy',  ico:'✍️', name:'文案写作工作台', desc:'公众号、种草文、通知', steps:['说明主题和读者','AI 给出提纲','分段成文','润色与校对'], ph:'例：给社区居民的垃圾分类通知'}
+];
+const QUOTES = ['知之为知之，不知为不知，是知也。','勿以恶小而为之，勿以善小而不为。','言必信，行必果。','实事求是，是一切工作的出发点。'];
+const SEED_POSTS = [
+  {id:1, name:'老周', text:'今天在菜市场多找了我 20 块，走出两条街才发现，又折回去还了。摊主愣了半天。分享一下，没别的意思。', likes:23, liked:false, cmts:[{name:'阿青',text:'这种小事最见人品。'}]},
+  {id:2, name:'林夏', text:'求教：公司让我在数据报告里"优化"一下口径，实际就是把不好看的数字藏起来。大家遇到过吗，怎么处理的？', likes:41, liked:false, cmts:[{name:'老周',text:'如实写，另附一页说明口径差异，让领导自己选。'}]},
+  {id:3, name:'阿青', text:'推荐一个核实消息来源的小习惯：转发前先搜一下原始出处，找不到就不转。', likes:17, liked:false, cmts:[]}
+];
+
+const fresh = () => ({
+  stage:'welcome', phone:'', agree:false, qi:0, answers:[], blocked:[],
+  score:0, dims:{a:50,b:50,c:50,d:50}, logs:[],
+  tab:'home', layout:['todo','habit','quote','hot'], edit:false,
+  todos:[{t:'看看社区的新帖子',d:false},{t:'和 AI 说说想要的功能',d:false}], note:'', habit:0, ledger:0,
+  posts:JSON.parse(JSON.stringify(SEED_POSTS)), openCmt:null,
+  chat:[{r:'ai',t:'你好，我是你的助手。\n告诉我你想在桌面上放一个什么样的功能，我来帮你添加。也可以直接聊聊天。'}],
+  bench:null, benchOut:'', sheet:null, name:'新同志'
+});
+let S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || '{}'));
+const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $app = document.getElementById('app');
+
+/* ---------- 模拟评估（正式版替换为大模型） ---------- */
+const NEG = ['骗','刷单','造谣','假货','坑人','傻','滚','蠢','举报不了','钻空子','薅','报复','伪造','代考','水军'];
+const POS = ['谢谢','感谢','抱歉','对不起','来源','查证','核实','如实','帮忙','分享','承认','改正','道歉','事实'];
+function scoreOpen(t){
+  t = t.trim(); if (t.length < 8) return 0;
+  let s = t.length >= 60 ? 3 : t.length >= 25 ? 2 : 1;
+  if (/因为|所以|但是|如果|理由|我认为|不过|然而/.test(t)) s += 1;
+  if (NEG.some(k => t.includes(k)) && !/不应|不能|反对|不该/.test(t)) s -= 1;
+  return Math.max(0, Math.min(4, s));
+}
+function judge(text, source){
+  const neg = NEG.filter(k => text.includes(k)), pos = POS.filter(k => text.includes(k));
+  let d = 0, why = '中性内容';
+  if (neg.length){ d = -Math.min(12, 6 * neg.length); why = '疑似不当倾向：' + neg.join('、'); }
+  else if (pos.length){ d = Math.min(3, pos.length); why = '正向信号：' + pos.join('、'); }
+  else if (text.length > 40){ d = 1; why = '认真表达'; }
+  applyDelta(d, source, why, text);
+}
+function applyDelta(d, source, why, text){
+  if (!d && source !== '注册问答') { S.logs.unshift({d:0, source, why, text:(text||'').slice(0,30)}); return; }
+  S.score = Math.max(0, Math.min(100, S.score + d));
+  const k = 'abcd'[Math.floor(Math.random()*4)];
+  S.dims[k] = Math.max(0, Math.min(100, S.dims[k] + d * 2));
+  S.logs.unshift({d, source, why, text:(text||'').slice(0,30)});
+  S.logs = S.logs.slice(0, 40);
+  if (S.stage === 'main' && S.score < PASS_LINE){ S.stage = 'banned'; S.blocked.push(S.phone); }
+}
+
+/* ---------- 视图 ---------- */
+const V = {
+  welcome: () => `<div class="screen pad" style="display:flex;flex-direction:column;justify-content:center">
+    <div style="font-size:52px">🌿</div><h1>同道</h1>
+    <p class="sub" style="font-size:15px">一个只为"是非分明、不损害他人、实事求是、正直善良"的人准备的地方。</p>
+    <div class="card" style="margin:24px 0"><div class="sub">加入需要回答几道问题，由 AI 评估是否与社区宗旨相符。<br>未通过将无法使用本应用。</div></div>
+    <button class="btn" data-act="go" data-v="phone">申请加入</button></div>`,
+
+  phone: () => `<div class="screen pad"><h1>手机号注册</h1><p class="sub">一个手机号只有一次申请机会。</p>
+    <div style="margin:20px 0 12px"><input id="phone" type="tel" maxlength="11" placeholder="请输入手机号" value="${esc(S.phone)}"></div>
+    <div class="row"><input placeholder="验证码（演示任意填写）"><button class="btn ghost small" style="flex:none">获取</button></div>
+    <div class="notice" style="margin-top:20px"><b>评估告知</b><br>本应用会收集你的注册问答，以及使用过程中的发帖、评论、与 AI 助手的对话等行为，用于持续评估你是否符合社区宗旨。评估结果会影响你能否继续使用。评估的具体内容不向用户展示。</div>
+    <label class="check"><input type="checkbox" id="agree" ${S.agree?'checked':''}><span>我已阅读并同意《用户协议》《隐私政策》及上述评估告知</span></label>
+    <button class="btn" data-act="startQuiz">开始答题</button><p id="err" class="sub" style="color:var(--warn)"></p></div>`,
+
+  quiz: () => { const q = QUIZ[S.qi], a = S.answers[S.qi];
+    return `<div class="screen pad"><div class="bar"><b style="width:${(S.qi+1)/QUIZ.length*100}%"></b></div>
+    <span class="tag">${q.type==='choice'?'选择题':'回答题'} ${S.qi+1}/${QUIZ.length}</span>
+    <h2 style="margin:14px 0 20px;line-height:1.5">${q.q}</h2>
+    ${q.type==='choice' ? q.opts.map((o,i)=>`<button class="opt ${a===i?'on':''}" data-act="pick" data-v="${i}">${o[0]}</button>`).join('')
+      : `<textarea id="open" rows="7" placeholder="请认真作答，没有标准答案（至少 8 个字）">${esc(a||'')}</textarea>`}
+    <div style="margin-top:20px"><button class="btn" data-act="next">${S.qi===QUIZ.length-1?'提交':'下一题'}</button></div></div>`; },
+
+  judging: () => `<div class="screen pad center" style="display:flex;flex-direction:column;justify-content:center">
+    <div class="spin"></div><h2>正在评估</h2><p class="sub">AI 正在阅读你的回答……</p></div>`,
+
+  rejected: () => `<div class="screen pad center" style="display:flex;flex-direction:column;justify-content:center">
+    <div style="font-size:48px">🍂</div><h2 style="margin:12px 0">很遗憾，未能通过</h2>
+    <p class="sub">根据评估，你暂不符合本应用的加入条件。<br>该手机号无法再次申请。</p>
+    <p class="sub" style="margin-top:24px">如认为评估有误，可<u>申请人工复核</u></p></div>`,
+
+  banned: () => `<div class="screen pad center" style="display:flex;flex-direction:column;justify-content:center">
+    <div style="font-size:48px">🚪</div><h2 style="margin:12px 0">账号已停用</h2>
+    <p class="sub">根据持续评估，你的使用行为已不符合社区宗旨。</p>
+    <p class="sub" style="margin-top:24px">如认为评估有误，可<u>申请人工复核</u></p></div>`,
+
+  main: () => `${V['tab_'+S.tab]()}${S.tab==='ai'||S.bench?'':''}
+    <nav class="tabs">${[['home','🏠','桌面'],['community','💬','社区'],['ai','✦','AI'],['bench','🧰','工作台'],['me','👤','我的']]
+      .map(([k,i,n])=>`<button class="${S.tab===k?'on':''} ${k==='ai'?'ai':''}" data-act="tab" data-v="${k}"><i>${i}</i>${n}</button>`).join('')}</nav>
+    ${S.sheet ? V['sheet_'+S.sheet]() : ''}`,
+
+  tab_home: () => `<div class="top"><h2>我的桌面</h2><div class="row">
+      ${S.edit?`<button class="btn ghost small" data-act="sheet" data-v="lib">＋ 添加</button>`:''}
+      <button class="btn ghost small" data-act="edit">${S.edit?'完成':'编辑'}</button></div></div>
+    <div class="screen" style="padding-top:4px"><div class="grid">
+      ${S.layout.map((id,i)=>`<div class="card ${WIDGETS[id].wide?'wide':''}">
+        ${S.edit?`<div class="edit-tools"><button data-act="mv" data-v="${i},-1">↑</button><button data-act="mv" data-v="${i},1">↓</button><button class="del" data-act="rm" data-v="${i}">✕</button></div>`:''}
+        <div class="w-title">${WIDGETS[id].name}</div>${W[id]()}</div>`).join('')}
+    </div>${S.layout.length?'':'<p class="sub center" style="margin-top:60px">桌面是空的。点"编辑"添加模块，或者去和 AI 说说你想要什么。</p>'}
+    <p class="sub center" style="margin-top:18px">想要新模块？点底部 ✦ 告诉 AI</p></div>`,
+
+  tab_community: () => `<div class="top"><h2>社区</h2><button class="btn small" data-act="sheet" data-v="post">发帖</button></div>
+    <div class="screen" style="padding-top:4px">${S.posts.map(p=>`<div class="card post">
+      <div class="row"><div class="avatar">${esc(p.name[0])}</div><b>${esc(p.name)}</b></div><p>${esc(p.text)}</p>
+      <div class="acts"><button data-act="like" data-v="${p.id}">${p.liked?'♥':'♡'} ${p.likes}</button><button data-act="cmt" data-v="${p.id}">评论 ${p.cmts.length}</button></div>
+      ${p.cmts.map(c=>`<div class="cmt"><b>${esc(c.name)}：</b>${esc(c.text)}</div>`).join('')}
+      ${S.openCmt===p.id?`<div class="row" style="margin-top:10px"><input id="cmtIn" placeholder="写下你的看法"><button class="btn small" style="flex:none" data-act="sendCmt" data-v="${p.id}">发送</button></div>`:''}
+    </div>`).join('')}</div>`,
+
+  tab_ai: () => `<div class="top"><h2>AI 助手</h2></div>
+    <div class="screen" id="chatScroll" style="padding-top:4px"><div class="chat">
+      ${S.chat.map((m,i)=>`<div class="msg ${m.r}">${esc(m.t)}${m.w?`<div style="margin-top:10px"><button class="btn small" data-act="addW" data-v="${m.w},${i}" ${m.done?'disabled':''}>${m.done?'已添加':'添加到桌面'}</button></div>`:''}${m.b?`<div style="margin-top:10px"><button class="btn small" data-act="openBench" data-v="${m.b}">打开工作台</button></div>`:''}</div>`).join('')}
+    </div></div>
+    <div style="padding:0 12px 8px"><div class="chips">${['我想要一个记账的模块','帮我加个习惯打卡','我要做一张海报','加一个考试倒计时'].map(t=>`<button data-act="chip" data-v="${t}">${t}</button>`).join('')}</div></div>
+    <div class="composer"><input id="chatIn" placeholder="说说你想要的功能…"><button data-act="send">↑</button></div>`,
+
+  tab_bench: () => S.bench ? (()=>{ const b = BENCHES.find(x=>x.id===S.bench); return `
+    <div class="top"><button data-act="closeBench">‹ 返回</button><h3>${b.name}</h3><span style="width:40px"></span></div>
+    <div class="screen" style="padding-top:4px"><div class="card"><div class="w-title">工作流</div>
+      ${b.steps.map((s,i)=>`<div class="step"><b>${i+1}</b><span>${s}</span></div>`).join('')}</div>
+      <div class="card"><div class="w-title">开始</div><textarea id="benchIn" rows="3" placeholder="${b.ph}"></textarea>
+      <div style="margin-top:10px"><button class="btn" data-act="runBench">交给 AI</button></div></div>
+      ${S.benchOut?`<div class="card"><div class="w-title">AI 产出（演示占位）</div><div style="line-height:1.7;font-size:14px;white-space:pre-wrap">${esc(S.benchOut)}</div></div>`:''}</div>`; })()
+    : `<div class="top"><h2>工作台</h2></div><div class="screen" style="padding-top:4px">
+      <p class="sub" style="margin:0 0 12px">选择一个工作流，或在 AI 助手里直接说出你要做的事。</p>
+      ${BENCHES.map(b=>`<button class="card wb" style="width:100%;text-align:left" data-act="openBench" data-v="${b.id}">
+        <div class="ico">${b.ico}</div><div style="flex:1"><h3>${b.name}</h3><div class="sub">${b.desc}</div></div><span class="sub">›</span></button>`).join('')}</div>`,
+
+  tab_me: () => `<div class="top"><h2>我的</h2></div><div class="screen" style="padding-top:4px">
+    <div class="card row"><div class="avatar" style="width:56px;height:56px;font-size:22px">${esc(S.name[0])}</div>
+      <div style="flex:1"><input id="nameIn" value="${esc(S.name)}" style="border:0;padding:0;font-size:18px;font-weight:700;background:none">
+      <div class="sub">${esc(S.phone.slice(0,3))}****${esc(S.phone.slice(-4))}</div></div></div>
+    <div class="card row between center"><div style="flex:1"><div class="big">${S.posts.filter(p=>p.mine).length}</div><div class="sub">帖子</div></div>
+      <div style="flex:1"><div class="big">${S.layout.length}</div><div class="sub">桌面模块</div></div>
+      <div style="flex:1"><div class="big">${S.habit}</div><div class="sub">打卡天数</div></div></div>
+    <div class="card" style="padding:0 14px">
+      <div class="list-item"><span>评估说明</span><span class="sub">›</span></div>
+      <div class="list-item"><span>隐私政策</span><span class="sub">›</span></div>
+      <div class="list-item"><span>申请人工复核</span><span class="sub">›</span></div>
+      <button class="list-item" style="width:100%" data-act="reset"><span style="color:var(--warn)">重置演示数据</span><span class="sub">›</span></button></div>
+    <p class="sub center">用户在这里看不到任何画像或分数</p></div>`,
+
+  sheet_lib: () => `<div class="sheet-mask" data-act="closeSheet"><div class="sheet" data-stop>
+    <h2 style="margin-bottom:12px">模块库</h2>${Object.entries(WIDGETS).map(([id,w])=>`<div class="card row between">
+      <div><b>${w.name}</b><div class="sub">${w.desc}</div></div>
+      <button class="btn small ${S.layout.includes(id)?'ghost':''}" data-act="libAdd" data-v="${id}" ${S.layout.includes(id)?'disabled':''}>${S.layout.includes(id)?'已添加':'添加'}</button></div>`).join('')}</div></div>`,
+
+  sheet_post: () => `<div class="sheet-mask" data-act="closeSheet"><div class="sheet" data-stop>
+    <h2 style="margin-bottom:12px">发帖</h2><textarea id="postIn" rows="6" placeholder="说点真实的"></textarea>
+    <div style="margin-top:12px"><button class="btn" data-act="sendPost">发布</button></div></div></div>`,
+
+  sheet_demo: () => `<div class="sheet-mask" data-act="closeSheet"><div class="sheet" data-stop>
+    <div class="row between"><h2>隐藏画像</h2><span class="tag" style="background:var(--warn-soft);color:var(--warn)">仅原型演示 · 用户不可见</span></div>
+    <div class="card" style="margin-top:12px"><div class="row between"><div><div class="sub">综合积分（淘汰线 ${PASS_LINE}）</div><div class="big" style="color:${S.score<PASS_LINE?'var(--warn)':'var(--brand)'}">${S.score}</div></div>
+      <div class="sub" style="text-align:right">距淘汰线<br><b style="font-size:18px;color:var(--ink)">${S.score-PASS_LINE}</b> 分</div></div>
+      ${[['a','是非分明'],['b','不损害他人'],['c','实事求是'],['d','正直善良']].map(([k,n])=>`<div class="dim"><div class="row between sub"><span>${n}</span><span>${S.dims[k]}</span></div><div class="bar"><b style="width:${S.dims[k]}%"></b></div></div>`).join('')}</div>
+    <div class="card"><div class="w-title">信号记录（最近 40 条）</div>
+      ${S.logs.length?S.logs.map(l=>`<div class="log"><b class="${l.d>0?'plus':l.d<0?'minus':''}">${l.d>0?'+':''}${l.d}</b> · ${esc(l.source)} · ${esc(l.why)}${l.text?`<br><span class="sub">"${esc(l.text)}"</span>`:''}</div>`).join(''):'<div class="sub">暂无</div>'}</div>
+    <p class="sub">试试在社区或 AI 对话里输入含"刷单""造谣""骗"的内容，观察扣分与淘汰。</p></div></div>`
+};
+
+/* ---------- 桌面模块 ---------- */
+const W = {
+  todo: () => S.todos.map((t,i)=>`<label class="todo ${t.d?'done':''}"><input type="checkbox" data-act="tg" data-v="${i}" ${t.d?'checked':''}><span>${esc(t.t)}</span></label>`).join('')
+    + `<div class="row" style="margin-top:8px"><input id="todoIn" placeholder="添加一项" style="padding:8px 12px"><button class="btn small" style="flex:none" data-act="addTodo">＋</button></div>`,
+  note: () => `<textarea id="noteIn" rows="3" placeholder="写点什么…">${esc(S.note)}</textarea>`,
+  habit: () => `<div class="big">${S.habit}<span class="sub"> 天</span></div><button class="btn ghost small" style="margin-top:10px" data-act="habit">今日打卡</button>`,
+  quote: () => `<div style="line-height:1.7;font-size:15px">${QUOTES[new Date().getDate()%QUOTES.length]}</div>`,
+  hot: () => S.posts.slice().sort((a,b)=>b.likes-a.likes).slice(0,2).map(p=>`<div style="font-size:14px;line-height:1.5;padding:4px 0"><span class="tag">♥ ${p.likes}</span> ${esc(p.text.slice(0,26))}…</div>`).join(''),
+  count: () => { const d = Math.ceil((new Date(new Date().getFullYear()+1,0,1)-new Date())/864e5); return `<div class="big">${d}<span class="sub"> 天</span></div><div class="sub">距离元旦</div>`; },
+  ledger: () => `<div class="big">¥${S.ledger}</div><div class="sub">今日支出</div><button class="btn ghost small" style="margin-top:8px" data-act="spend">记一笔 ¥10</button>`,
+  wbfast: () => `<div class="row" style="flex-wrap:wrap;gap:8px">${BENCHES.slice(0,3).map(b=>`<button style="font-size:26px" data-act="openBench" data-v="${b.id}">${b.ico}</button>`).join('')}</div>`
+};
+
+function render(){
+  const demo = ['main','rejected','banned'].includes(S.stage) ? `<button class="demo-btn" data-act="sheet" data-v="demo">演示</button>` : '';
+  $app.innerHTML = demo + V[S.stage]() + (S.stage!=='main' && S.sheet ? V['sheet_'+S.sheet]() : '');
+  const c = document.getElementById('chatScroll'); if (c) c.scrollTop = c.scrollHeight;
+  save();
+}
+
+/* ---------- AI 对话（模拟） ---------- */
+function aiReply(text){
+  const b = BENCHES.find(x => (x.id==='image'&&/海报|图片|设计|头像|画/.test(text)) || (x.id==='video'&&/视频|剪辑|短片/.test(text)) || (x.id==='shop'&&/电商|店铺|商品|卖货/.test(text)) || (x.id==='copy'&&/文案|写一篇|公众号|通知/.test(text)));
+  if (b) return {r:'ai', t:`这件事适合用「${b.name}」来做，流程是：${b.steps.join(' → ')}。`, b:b.id};
+  const id = Object.keys(WIDGET_KEYWORDS).find(k => WIDGET_KEYWORDS[k].some(w => text.toLowerCase().includes(w)));
+  if (id) return S.layout.includes(id)
+    ? {r:'ai', t:`你的桌面上已经有「${WIDGETS[id].name}」了。需要我调整它，还是换一个别的？`}
+    : {r:'ai', t:`明白，我为你准备了「${WIDGETS[id].name}」模块：${WIDGETS[id].desc}。`, w:id};
+  if (NEG.some(k => text.includes(k))) return {r:'ai', t:'这件事我帮不了，它可能会损害别人的利益。换个方向，我很乐意帮忙。'};
+  return {r:'ai', t:'我在听。你可以说得再具体一点，比如"我想要一个记账的模块"，或者"帮我做一张海报"。'};
+}
+function sendChat(text){
+  text = text.trim(); if (!text) return;
+  S.chat.push({r:'me', t:text}); judge(text, 'AI 对话');
+  if (S.stage === 'main') S.chat.push(aiReply(text));
+  render();
+}
+
+/* ---------- 事件 ---------- */
+const A = {
+  go: v => { S.stage = v; },
+  startQuiz: () => {
+    const p = document.getElementById('phone').value.trim(), ok = document.getElementById('agree').checked;
+    S.phone = p; S.agree = ok;
+    const err = !/^1\d{10}$/.test(p) ? '请输入正确的 11 位手机号' : S.blocked.includes(p) ? '该手机号已无法申请' : !ok ? '请先阅读并同意评估告知' : '';
+    if (err) { save(); document.getElementById('err').textContent = err; return false; }
+    S.stage = 'quiz'; S.qi = 0; S.answers = [];
+  },
+  pick: v => { S.answers[S.qi] = +v; },
+  next: () => {
+    const q = QUIZ[S.qi];
+    if (q.type === 'open') { const t = document.getElementById('open').value; if (t.trim().length < 8) return false; S.answers[S.qi] = t; }
+    else if (S.answers[S.qi] == null) return false;
+    if (S.qi < QUIZ.length - 1) { S.qi++; return; }
+    S.stage = 'judging';
+    setTimeout(() => {
+      const raw = QUIZ.reduce((s,q,i)=> s + (q.type==='choice' ? q.opts[S.answers[i]][1] : scoreOpen(S.answers[i])), 0);
+      S.score = Math.round(raw / (QUIZ.length*4) * 100); S.logs = [];
+      S.dims = {a:S.score, b:S.score, c:S.score, d:S.score};
+      S.logs.unshift({d:S.score, source:'注册问答', why:`初始分（原始 ${raw}/${QUIZ.length*4}）`, text:''});
+      if (S.score < PASS_LINE) { S.stage = 'rejected'; S.blocked.push(S.phone); } else { S.stage = 'main'; S.tab = 'home'; }
+      render();
+    }, 1600);
+  },
+  tab: v => { S.tab = v; S.edit = false; S.openCmt = null; },
+  edit: () => { S.edit = !S.edit; },
+  sheet: v => { S.sheet = v; },
+  closeSheet: () => { S.sheet = null; },
+  mv: v => { const [i,d] = v.split(',').map(Number), j = i + d; if (j<0||j>=S.layout.length) return false; [S.layout[i],S.layout[j]] = [S.layout[j],S.layout[i]]; },
+  rm: v => { S.layout.splice(+v,1); },
+  libAdd: v => { if (!S.layout.includes(v)) S.layout.push(v); },
+  addW: v => { const [id,i] = v.split(','); if (!S.layout.includes(id)) S.layout.push(id); S.chat[+i].done = true; S.chat.push({r:'ai', t:'已添加到桌面，去"桌面"看看吧。'}); },
+  tg: v => { S.todos[+v].d = !S.todos[+v].d; },
+  addTodo: () => { const t = document.getElementById('todoIn').value.trim(); if (!t) return false; S.todos.push({t, d:false}); },
+  habit: () => { S.habit++; }, spend: () => { S.ledger += 10; },
+  like: v => { const p = S.posts.find(p=>p.id==v); p.liked = !p.liked; p.likes += p.liked?1:-1; },
+  cmt: v => { S.openCmt = S.openCmt==v ? null : +v; },
+  sendCmt: v => { const t = document.getElementById('cmtIn').value.trim(); if (!t) return false; S.posts.find(p=>p.id==v).cmts.push({name:S.name, text:t}); S.openCmt = null; judge(t, '社区评论'); },
+  sendPost: () => { const t = document.getElementById('postIn').value.trim(); if (!t) return false; S.posts.unshift({id:Date.now(), name:S.name, text:t, likes:0, liked:false, cmts:[], mine:true}); S.sheet = null; judge(t, '社区发帖'); },
+  send: () => { sendChat(document.getElementById('chatIn').value); return false; },
+  chip: v => { sendChat(v); return false; },
+  openBench: v => { S.bench = v; S.benchOut = ''; S.tab = 'bench'; },
+  closeBench: () => { S.bench = null; },
+  runBench: () => { const t = document.getElementById('benchIn').value.trim(); if (!t) return false; const b = BENCHES.find(x=>x.id===S.bench);
+    judge(t, '工作台输入'); S.benchOut = `需求：${t}\n\n${b.steps.map((s,i)=>`${i+1}. ${s} —— 已完成（占位）`).join('\n')}\n\n正式版会在这里展示真实的生成结果。`; },
+  reset: () => { if (!confirm('清空所有演示数据并回到注册页？')) return false; localStorage.removeItem(KEY); S = fresh(); }
+};
+$app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  if (el.dataset.act === 'closeSheet' && e.target.closest('[data-stop]')) return;
+  if (el.tagName === 'INPUT' && el.type === 'checkbox') { A[el.dataset.act](el.dataset.v); render(); return; }
+  if (A[el.dataset.act](el.dataset.v) !== false) render();
+});
+$app.addEventListener('input', e => {
+  if (e.target.id === 'noteIn') { S.note = e.target.value; save(); }
+  if (e.target.id === 'nameIn') { S.name = e.target.value || '新同志'; save(); }
+});
+$app.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  if (e.target.id === 'chatIn') sendChat(e.target.value);
+  if (e.target.id === 'todoIn') { if (A.addTodo() !== false) render(); }
+});
+if (S.stage === 'judging') S.stage = 'quiz';
+render();
+</script>
+</body>
+</html>
