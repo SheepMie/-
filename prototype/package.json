@@ -1,0 +1,11 @@
+{
+  "name": "tongdao-prototype",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i src/input.css -o dist.css --minify && node build.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

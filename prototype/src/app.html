@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f4f5">
+<title>同道 · 原型预览</title>
+<style>/*__CSS__*/</style>
+</head>
+<body class="h-dvh bg-zinc-300 font-sans text-zinc-900 antialiased">
+<div id="app" class="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-zinc-100"></div>
+<script>
+/* ============ 原型说明 ============
+   纯前端演示：所有"AI 评估"都是本地关键词规则模拟，正式版由后端大模型完成。
+   "我的"页里的"隐藏画像"入口仅供产品方查看，真实用户端不存在该入口。
+   样式使用 Tailwind CSS，修改后运行 npm run build 重新生成 index.html。 */
+const PASS_LINE = 50;
+const KEY = 'tongdao_proto_v2';
+
+const QUIZ = [
+  {type:'choice', q:'你发现一位平时很照顾你的同事，在报销单里多报了 200 元。你会？',
+   opts:[['装作没看见，不关我的事',1],['私下提醒他改正',4],['直接向上级反映',3],['既然没人查，我下次也多报一点',0]]},
+  {type:'choice', q:'你在网上看到一条让人很气愤的消息，但没有任何来源。你会？',
+   opts:[['立刻转发，让更多人知道',0],['转发并注明"不确定真假"',2],['与我无关，划走',2],['先查证，确认后再决定是否转发',4]]},
+  {type:'choice', q:'你要卖掉一部二手手机，屏幕有一处买家很难发现的暗伤。你会？',
+   opts:[['主动说明，并适当让价',4],['不提，对方没发现就算了',0],['对方问到再说',2],['只写"成色如图"',1]]},
+  {type:'choice', q:'小组项目交付后，你发现一个关键错误是自己造成的，目前没人知道。你会？',
+   opts:[['等别人发现了再说',1],['悄悄改掉，不声张',2],['主动说明并负责补救',4],['暗示可能是别人的环节出了问题',0]]},
+  {type:'open', q:'"善意的谎言"违背实事求是吗？请写出你的立场和理由。'}
+];
+
+const WIDGETS = {
+  todo:   {name:'待办清单', wide:true,  desc:'记录今天要做的事'},
+  habit:  {name:'习惯打卡', wide:false, desc:'每天点一下，累计天数'},
+  quote:  {name:'每日一句', wide:false, desc:'一句值得想一想的话'},
+  hot:    {name:'社区热帖', wide:true,  desc:'社区里正在讨论什么'},
+  note:   {name:'随手记',   wide:true,  desc:'一块自由书写的便签'},
+  count:  {name:'倒计时',   wide:false, desc:'距离重要日子还有几天'},
+  ledger: {name:'记账',     wide:false, desc:'快速记一笔支出'}
+};
+const WIDGET_KEYWORDS = {
+  todo:['待办','任务','清单','todo','计划'], note:['笔记','便签','记录','随手记','备忘'],
+  habit:['打卡','习惯','坚持','早起','运动'], quote:['一句','语录','名言'],
+  hot:['热帖','社区','热门'], count:['倒计时','纪念日','还有几天','考试'],
+  ledger:['记账','花销','支出','账本','花了']
+};
+const QUOTES = ['知之为知之，不知为不知，是知也。','勿以恶小而为之，勿以善小而不为。','言必信，行必果。','实事求是，是一切工作的出发点。'];
+const SEED_POSTS = [
+  {id:2, name:'林夏', time:'12 分钟前', text:'求教：公司让我在数据报告里"优化"一下口径，实际就是把不好看的数字藏起来。大家遇到过吗，怎么处理的？', likes:41, liked:false, cmts:[{name:'老周',text:'如实写，另附一页说明口径差异，让领导自己选。'}]},
+  {id:1, name:'老周', time:'1 小时前', text:'今天在菜市场多找了我 20 块，走出两条街才发现，又折回去还了。摊主愣了半天。分享一下，没别的意思。', likes:23, liked:false, cmts:[{name:'阿青',text:'这种小事最见人品。'}]},
+  {id:3, name:'阿青', time:'3 小时前', text:'推荐一个核实消息来源的小习惯：转发前先搜一下原始出处，找不到就不转。', likes:17, liked:false, cmts:[]}
+];
+const AVATAR = ['bg-emerald-100 text-emerald-700','bg-sky-100 text-sky-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-violet-100 text-violet-700'];
+const avatarCls = n => AVATAR[(n.charCodeAt(0) || 0) % AVATAR.length];
+
+const fresh = () => ({
+  stage:'welcome', phone:'', agree:false, err:'', qi:0, answers:[], blocked:[],
+  score:0, dims:{a:50,b:50,c:50,d:50}, logs:[],
+  tab:'home', layout:['todo','habit','quote','hot'], edit:false,
+  todos:[{t:'看看社区的新帖子',d:false},{t:'和 AI 说说想要的功能',d:false}], note:'', habit:0, ledger:0,
+  posts:JSON.parse(JSON.stringify(SEED_POSTS)), openCmt:null,
+  chat:[{r:'ai',t:'你好，我是你的助手。\n告诉我你想在桌面上放一个什么样的功能，我来帮你添加。也可以直接聊聊天。'}],
+  sheet:null, name:'新同志'
+});
+let S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || '{}'));
+const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $app = document.getElementById('app');
+
+/* ---------- 图标 ---------- */
+const PATHS = {
+  home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  chat:'<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 20.5l1.5-5.1A8.5 8.5 0 1 1 21 11.5z"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  spark:'<path d="M11 3l2 5.5L18.5 10.5 13 12.5 11 18l-2-5.5L3.5 10.5 9 8.5z"/><path d="M19 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  up:'<path d="M12 19V5M6 11l6-6 6 6"/>', down:'<path d="M12 5v14M6 13l6 6 6-6"/>',
+  left:'<path d="M15 5l-7 7 7 7"/>', right:'<path d="M9 5l7 7-7 7"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  heart:'<path d="M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5c0 6.100-8 11-8 11z"/>',
+  bubble:'<path d="M4 5h16v11H9l-5 4z"/>',
+  shield:'<path d="M12 3l8 3v6c0 4.500-3.200 8-8 9-4.800-1-8-4.500-8-9V6z"/><path d="M9 12l2.200 2.200L15 10.500"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>', lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'
+};
+const ic = (n, cls='size-5', fill='none') => `<svg class="${cls} shrink-0" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${PATHS[n]}</svg>`;
+
+/* ---------- 模拟评估（正式版替换为大模型） ---------- */
+const NEG = ['骗','刷单','造谣','假货','坑人','傻','滚','蠢','钻空子','薅','报复','伪造','代考','水军'];
+const POS = ['谢谢','感谢','抱歉','对不起','来源','查证','核实','如实','帮忙','分享','承认','改正','道歉','事实'];
+function scoreOpen(t){
+  t = t.trim(); if (t.length < 8) return 0;
+  let s = t.length >= 60 ? 3 : t.length >= 25 ? 2 : 1;
+  if (/因为|所以|但是|如果|理由|我认为|不过|然而/.test(t)) s += 1;
+  if (NEG.some(k => t.includes(k)) && !/不应|不能|反对|不该/.test(t)) s -= 1;
+  return Math.max(0, Math.min(4, s));
+}
+function judge(text, source){
+  const neg = NEG.filter(k => text.includes(k)), pos = POS.filter(k => text.includes(k));
+  let d = 0, why = '中性内容';
+  if (neg.length){ d = -Math.min(12, 6 * neg.length); why = '疑似不当倾向：' + neg.join('、'); }
+  else if (pos.length){ d = Math.min(3, pos.length); why = '正向信号：' + pos.join('、'); }
+  else if (text.length > 40){ d = 1; why = '认真表达'; }
+  S.score = Math.max(0, Math.min(100, S.score + d));
+  if (d){ const k = 'abcd'[Math.floor(Math.random()*4)]; S.dims[k] = Math.max(0, Math.min(100, S.dims[k] + d * 2)); }
+  S.logs.unshift({d, source, why, text:text.slice(0,30)});
+  S.logs = S.logs.slice(0, 40);
+  if (S.stage === 'main' && S.score < PASS_LINE){ S.stage = 'banned'; S.sheet = null; S.blocked.push(S.phone); }
+}
+
+/* ---------- 通用片段 ---------- */
+const BTN = 'flex h-14 w-full items-center justify-center rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition active:scale-[.98] disabled:opacity-40';
+const PILL = 'inline-flex h-9 items-center gap-1 rounded-full px-4 text-[13px] font-semibold transition active:scale-95';
+const endPage = (icon, title, body) => `<div class="flex flex-1 flex-col items-center justify-center px-10 text-center rise">
+  <div class="mb-6 flex size-20 items-center justify-center rounded-full bg-white text-zinc-400 shadow-sm ring-1 ring-zinc-200">${ic(icon,'size-9')}</div>
+  <h2 class="text-[22px] font-bold tracking-tight">${title}</h2>
+  <p class="mt-3 text-[15px] leading-7 text-zinc-500">${body}</p>
+  <div class="mt-16 flex gap-2 text-[12px] text-zinc-400"><button class="rounded-full bg-zinc-200/70 px-3 py-1.5" data-act="sheet" data-v="demo">查看隐藏画像（演示）</button><button class="rounded-full bg-zinc-200/70 px-3 py-1.5" data-act="reset">重置演示</button></div></div>`;
+const sheet = (inner, dark) => `<div class="absolute inset-0 z-40 flex items-end bg-black/40 backdrop-blur-[2px]" data-act="closeSheet">
+  <div class="sheet-in no-bar max-h-[86%] w-full overflow-y-auto rounded-t-[28px] ${dark?'bg-zinc-950 text-white':'bg-white'} px-5 pb-8 pt-3" data-stop>
+  <div class="mx-auto mb-4 h-1 w-10 rounded-full ${dark?'bg-white/20':'bg-zinc-200'}"></div>${inner}</div></div>`;
+
+/* ---------- 视图 ---------- */
+const V = {
+  welcome: () => `<div class="relative flex flex-1 flex-col overflow-hidden bg-zinc-950 px-7 pb-10 pt-20 text-white">
+    <div class="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-emerald-500/30 blur-3xl"></div>
+    <div class="pointer-events-none absolute -left-32 bottom-20 size-80 rounded-full bg-teal-400/10 blur-3xl"></div>
+    <div class="relative flex-1 rise">
+      <div class="mb-8 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[12px] text-white/70 ring-1 ring-white/10">${ic('shield','size-3.5')} 邀请制 · AI 准入评估</div>
+      <h1 class="font-serif text-[64px] font-bold leading-none tracking-tight">同道</h1>
+      <p class="mt-6 text-[17px] leading-8 text-white/60">一个只为同道中人准备的地方。<br>在这里，大家说真话，做实事。</p>
+      <div class="mt-10 grid grid-cols-2 gap-3">
+        ${['是非分明','不损害他人','实事求是','正直善良'].map(t=>`<div class="rounded-2xl bg-white/[.06] px-4 py-4 text-[15px] font-medium ring-1 ring-white/10">${t}</div>`).join('')}
+      </div>
+    </div>
+    <div class="relative">
+      <button class="flex h-14 w-full items-center justify-center rounded-2xl bg-white text-[16px] font-semibold text-zinc-950 transition active:scale-[.98]" data-act="go" data-v="phone">申请加入</button>
+      <p class="mt-4 text-center text-[12px] leading-5 text-white/40">需回答 5 道问题，由 AI 评估是否与社区宗旨相符</p>
+    </div></div>`,
+
+  phone: () => `<div class="no-bar flex flex-1 flex-col overflow-y-auto px-6 pb-8 pt-14 rise">
+    <button class="mb-8 flex size-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-200" data-act="go" data-v="welcome">${ic('left')}</button>
+    <h1 class="text-[30px] font-bold tracking-tight">手机号注册</h1>
+    <p class="mt-2 text-[15px] text-zinc-500">一个手机号只有一次申请机会</p>
+    <div class="mt-8 space-y-3">
+      <div class="flex h-14 items-center rounded-2xl bg-white px-4 ring-1 ring-zinc-200 focus-within:ring-2 focus-within:ring-zinc-900">
+        <span class="border-r border-zinc-200 pr-3 text-[16px] font-medium text-zinc-500">+86</span>
+        <input id="phone" type="tel" maxlength="11" placeholder="请输入手机号" value="${esc(S.phone)}" class="h-full flex-1 bg-transparent pl-3 text-[16px] outline-none placeholder:text-zinc-400"></div>
+      <div class="flex h-14 items-center rounded-2xl bg-white px-4 ring-1 ring-zinc-200 focus-within:ring-2 focus-within:ring-zinc-900">
+        <input placeholder="验证码（演示可不填）" class="h-full min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-zinc-400">
+        <span class="shrink-0 whitespace-nowrap text-[14px] font-semibold text-emerald-600">获取验证码</span></div>
+    </div>
+    <div class="mt-6 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200/70">
+      <div class="flex items-center gap-2 text-[14px] font-semibold text-amber-900">${ic('shield','size-4')} 评估告知</div>
+      <p class="mt-2 text-[13px] leading-6 text-amber-900/80">本应用会收集你的注册问答，以及使用过程中的发帖、评论、与 AI 助手的对话等行为，用于持续评估你是否符合社区宗旨。评估由 AI 完成，结果会影响你能否继续使用，具体内容不向用户展示。</p>
+    </div>
+    <button class="mt-5 flex items-start gap-3 text-left" data-act="agree">
+      <span class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md ${S.agree?'bg-zinc-900 text-white':'bg-white ring-1 ring-zinc-300'}">${S.agree?ic('check','size-3.5'):''}</span>
+      <span class="text-[13px] leading-5 text-zinc-600">我已阅读并同意《用户协议》《隐私政策》及上述评估告知</span></button>
+    <div class="flex-1"></div>
+    <p class="mb-3 mt-6 min-h-5 text-center text-[13px] text-rose-600">${esc(S.err)}</p>
+    <button class="${BTN}" data-act="startQuiz">开始答题</button></div>`,
+
+  quiz: () => { const q = QUIZ[S.qi], a = S.answers[S.qi];
+    return `<div class="flex flex-1 flex-col overflow-hidden px-6 pb-8 pt-14">
+    <div class="mb-8 flex gap-1.5">${QUIZ.map((_,i)=>`<div class="h-1 flex-1 rounded-full ${i<=S.qi?'bg-zinc-900':'bg-zinc-300'}"></div>`).join('')}</div>
+    <div class="no-bar flex-1 overflow-y-auto rise">
+      <div class="text-[13px] font-semibold text-emerald-600">${q.type==='choice'?'选择题':'回答题'} · ${S.qi+1} / ${QUIZ.length}</div>
+      <h2 class="mt-3 text-[22px] font-bold leading-9 tracking-tight">${q.q}</h2>
+      <div class="mt-7 space-y-3 p-0.5">
+      ${q.type==='choice' ? q.opts.map((o,i)=>`<button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition active:scale-[.99] ${a===i?'ring-2 ring-zinc-900':'ring-1 ring-zinc-200'}" data-act="pick" data-v="${i}">
+          <span class="flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${a===i?'bg-zinc-900 text-white':'bg-zinc-100 text-zinc-500'}">${'ABCD'[i]}</span>
+          <span class="text-[15px] leading-6">${o[0]}</span></button>`).join('')
+        : `<textarea id="open" rows="8" placeholder="请认真作答，没有标准答案" class="w-full resize-none rounded-2xl bg-white p-4 text-[16px] leading-7 outline-none ring-1 ring-zinc-200 placeholder:text-zinc-400 focus:ring-2 focus:ring-zinc-900">${esc(a||'')}</textarea>
+           <p class="text-[12px] text-zinc-400">至少 8 个字。AI 会阅读你的理由，而不只是立场。</p>`}
+      </div></div>
+    <button class="${BTN} mt-4" data-act="next">${S.qi===QUIZ.length-1?'提交评估':'下一题'}</button></div>`; },
+
+  judging: () => `<div class="flex flex-1 flex-col items-center justify-center bg-zinc-950 text-white">
+    <div class="relative mb-10 size-24"><div class="absolute inset-0 animate-ping rounded-full bg-emerald-400/30"></div>
+      <div class="absolute inset-2 flex items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-teal-600">${ic('spark','size-9')}</div></div>
+    <h2 class="text-[20px] font-semibold">正在评估</h2><p class="mt-2 text-[14px] text-white/50">AI 正在阅读你的回答</p></div>`,
+
+  rejected: () => endPage('lock', '很遗憾，未能通过', '根据 AI 评估，你暂不符合本应用的加入条件。<br>该手机号无法再次申请。'),
+  banned: () => endPage('lock', '账号已停用', '根据持续评估，你的使用行为已不符合社区宗旨，无法继续使用本应用。'),
+
+  main: () => S.tab === 'ai' ? V.ai() : `${V['tab_'+S.tab]()}
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 bg-gradient-to-t from-zinc-100 via-zinc-100/90 to-transparent px-5 pb-6 pt-8">
+      <nav class="pointer-events-auto flex h-16 flex-1 items-center rounded-full bg-white/90 p-1.5 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-900/5 backdrop-blur">
+        ${[['home','home','桌面'],['community','chat','社区'],['me','user','我的']].map(([k,i,n])=>`<button class="flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition ${S.tab===k?'bg-zinc-900 text-white':'text-zinc-400'}" data-act="tab" data-v="${k}">${ic(i)}${S.tab===k?n:''}</button>`).join('')}
+      </nav>
+      <button class="pointer-events-auto flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-600/40 transition active:scale-95" data-act="tab" data-v="ai" aria-label="AI 助手">${ic('spark','size-7')}</button>
+    </div>`,
+
+  tab_home: () => { const h = new Date().getHours(), d = new Date();
+    return `<header class="flex items-end justify-between px-5 pb-4 pt-14">
+      <div><div class="text-[13px] text-zinc-500">${d.getMonth()+1} 月 ${d.getDate()} 日 · 星期${'日一二三四五六'[d.getDay()]}</div>
+      <h1 class="mt-1 text-[28px] font-bold tracking-tight">${h<6?'夜深了':h<12?'早上好':h<18?'下午好':'晚上好'}，${esc(S.name)}</h1></div>
+      <div class="flex gap-2">${S.edit?`<button class="${PILL} bg-white ring-1 ring-zinc-200" data-act="sheet" data-v="lib">${ic('plus','size-4')}添加</button>`:''}
+      <button class="${PILL} ${S.edit?'bg-zinc-900 text-white':'bg-white ring-1 ring-zinc-200'}" data-act="edit">${S.edit?'完成':'编辑'}</button></div></header>
+    <div class="no-bar flex-1 overflow-y-auto px-5 pb-32"><div class="grid grid-flow-dense grid-cols-2 gap-3">
+      ${S.layout.map((id,i)=>`<div class="relative ${WIDGETS[id].wide?'col-span-2':''}">${W[id]()}
+        ${S.edit?`<div class="absolute inset-0 rounded-3xl ring-2 ring-zinc-900/10"></div><div class="absolute right-2 top-2 flex gap-1 rounded-full bg-white p-1 shadow-md ring-1 ring-zinc-900/5">
+          <button class="flex size-7 items-center justify-center rounded-full text-zinc-600 active:bg-zinc-100" data-act="mv" data-v="${i},-1">${ic('up','size-4')}</button>
+          <button class="flex size-7 items-center justify-center rounded-full text-zinc-600 active:bg-zinc-100" data-act="mv" data-v="${i},1">${ic('down','size-4')}</button>
+          <button class="flex size-7 items-center justify-center rounded-full bg-rose-500 text-white" data-act="rm" data-v="${i}">${ic('x','size-4')}</button></div>`:''}</div>`).join('')}
+      </div>
+      ${S.layout.length?'':'<p class="mt-24 text-center text-[14px] leading-7 text-zinc-400">桌面是空的<br>点"编辑"添加模块，或者告诉 AI 你想要什么</p>'}
+      <button class="mt-3 flex w-full items-center gap-3 rounded-3xl border border-dashed border-zinc-300 p-4 text-left" data-act="tab" data-v="ai">
+        <span class="flex size-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">${ic('spark')}</span>
+        <span class="flex-1"><span class="block text-[15px] font-semibold">想要新的模块？</span><span class="block text-[13px] text-zinc-500">告诉 AI 你需要什么功能</span></span>
+        <span class="text-zinc-300">${ic('right')}</span></button></div>`; },
+
+  tab_community: () => `<header class="flex items-end justify-between px-5 pb-4 pt-14">
+      <div><div class="text-[13px] text-zinc-500">说点真实的</div><h1 class="mt-1 text-[28px] font-bold tracking-tight">社区</h1></div>
+      <button class="${PILL} bg-zinc-900 text-white" data-act="sheet" data-v="post">${ic('edit','size-4')}发帖</button></header>
+    <div class="no-bar flex-1 space-y-3 overflow-y-auto px-5 pb-32">${S.posts.map(p=>`<article class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-zinc-900/5">
+      <div class="flex items-center gap-3"><div class="flex size-10 items-center justify-center rounded-full text-[15px] font-bold ${avatarCls(p.name)}">${esc(p.name[0])}</div>
+        <div><div class="text-[15px] font-semibold">${esc(p.name)}</div><div class="text-[12px] text-zinc-400">${esc(p.time||'刚刚')}</div></div></div>
+      <p class="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-800">${esc(p.text)}</p>
+      <div class="mt-4 flex gap-2 text-[13px] font-medium">
+        <button class="flex h-9 items-center gap-1.5 rounded-full px-3 ${p.liked?'bg-rose-50 text-rose-600':'bg-zinc-100 text-zinc-600'}" data-act="like" data-v="${p.id}">${ic('heart','size-4',p.liked?'currentColor':'none')}${p.likes}</button>
+        <button class="flex h-9 items-center gap-1.5 rounded-full bg-zinc-100 px-3 text-zinc-600" data-act="cmt" data-v="${p.id}">${ic('bubble','size-4')}${p.cmts.length||'评论'}</button></div>
+      ${p.cmts.length?`<div class="mt-4 space-y-3 border-t border-zinc-100 pt-4">${p.cmts.map(c=>`<div class="flex gap-2.5"><div class="flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarCls(c.name)}">${esc(c.name[0])}</div>
+        <div class="text-[14px] leading-6"><span class="font-semibold">${esc(c.name)}</span><span class="ml-2 break-words text-zinc-700">${esc(c.text)}</span></div></div>`).join('')}</div>`:''}
+      ${S.openCmt===p.id?`<div class="mt-4 flex h-11 items-center gap-2 rounded-full bg-zinc-100 pl-4 pr-1"><input id="cmtIn" placeholder="写下你的看法" class="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-zinc-400">
+        <button class="flex size-9 items-center justify-center rounded-full bg-zinc-900 text-white" data-act="sendCmt" data-v="${p.id}">${ic('up','size-4')}</button></div>`:''}
+    </article>`).join('')}</div>`,
+
+  ai: () => `<header class="flex items-center gap-3 border-b border-zinc-200/70 bg-zinc-100 px-4 pb-3 pt-12">
+      <button class="flex size-10 items-center justify-center rounded-full bg-white ring-1 ring-zinc-200" data-act="tab" data-v="home">${ic('left')}</button>
+      <div class="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white">${ic('spark')}</div>
+      <div><div class="text-[16px] font-semibold">AI 助手</div><div class="text-[12px] text-zinc-500">描述你想要的功能</div></div></header>
+    <div class="no-bar flex-1 space-y-3 overflow-y-auto px-4 py-4" id="chatScroll">
+      ${S.chat.map((m,i)=>m.r==='me'
+        ? `<div class="flex justify-end"><div class="max-w-[82%] whitespace-pre-wrap break-words rounded-3xl rounded-br-lg bg-zinc-900 px-4 py-3 text-[15px] leading-6 text-white">${esc(m.t)}</div></div>`
+        : `<div class="flex"><div class="max-w-[82%] whitespace-pre-wrap break-words rounded-3xl rounded-bl-lg bg-white px-4 py-3 text-[15px] leading-6 shadow-sm ring-1 ring-zinc-900/5">${esc(m.t)}${m.w?`
+            <div class="mt-3 flex items-center gap-3 rounded-2xl bg-zinc-50 p-3 ring-1 ring-zinc-200"><div class="flex-1"><div class="text-[14px] font-semibold">${WIDGETS[m.w].name}</div><div class="text-[12px] text-zinc-500">${WIDGETS[m.w].desc}</div></div>
+            <button class="${PILL} ${m.done?'bg-zinc-200 text-zinc-500':'bg-emerald-600 text-white'}" data-act="addW" data-v="${m.w},${i}" ${m.done?'disabled':''}>${m.done?'已添加':'添加'}</button></div>`:''}</div></div>`).join('')}
+    </div>
+    <div class="no-bar flex gap-2 overflow-x-auto px-4 pb-3">${['我想要一个记账的模块','帮我加个习惯打卡','加一个考试倒计时','我想记点笔记'].map(t=>`<button class="h-9 shrink-0 rounded-full bg-white px-4 text-[13px] text-zinc-700 ring-1 ring-zinc-200" data-act="chip" data-v="${t}">${t}</button>`).join('')}</div>
+    <div class="bg-white px-4 pb-7 pt-3 shadow-[0_-1px_0_rgba(0,0,0,.05)]"><div class="flex h-12 items-center gap-2 rounded-full bg-zinc-100 pl-5 pr-1.5">
+      <input id="chatIn" placeholder="说说你想要的功能…" class="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-zinc-400">
+      <button class="flex size-9 items-center justify-center rounded-full bg-zinc-900 text-white" data-act="send">${ic('up','size-4')}</button></div></div>`,
+
+  tab_me: () => `<header class="px-5 pb-4 pt-14"><h1 class="text-[28px] font-bold tracking-tight">我的</h1></header>
+    <div class="no-bar flex-1 space-y-3 overflow-y-auto px-5 pb-32">
+    <div class="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-zinc-900/5">
+      <div class="flex size-16 items-center justify-center rounded-full text-[24px] font-bold ${avatarCls(S.name)}">${esc(S.name[0])}</div>
+      <div class="min-w-0 flex-1"><input id="nameIn" value="${esc(S.name)}" maxlength="12" class="w-full bg-transparent text-[20px] font-bold outline-none">
+      <div class="mt-0.5 text-[13px] text-zinc-500">${esc(S.phone.slice(0,3))} **** ${esc(S.phone.slice(-4))}</div></div>
+      <span class="text-zinc-300">${ic('edit','size-4')}</span></div>
+    <div class="grid grid-cols-3 gap-3">${[[S.posts.filter(p=>p.mine).length,'帖子'],[S.layout.length,'桌面模块'],[S.habit,'打卡天数']].map(([n,l])=>`<div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-zinc-900/5"><div class="text-[26px] font-bold tabular-nums tracking-tight">${n}</div><div class="mt-0.5 text-[12px] text-zinc-500">${l}</div></div>`).join('')}</div>
+    <div class="divide-y divide-zinc-100 rounded-3xl bg-white px-5 shadow-sm ring-1 ring-zinc-900/5">
+      ${['评估说明','用户协议','隐私政策'].map(t=>`<div class="flex h-14 items-center justify-between text-[15px]"><span>${t}</span><span class="text-zinc-300">${ic('right','size-4')}</span></div>`).join('')}
+      <button class="flex h-14 w-full items-center justify-between text-[15px]" data-act="sheet" data-v="demo"><span>隐藏画像<span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">仅原型演示</span></span><span class="text-zinc-300">${ic('right','size-4')}</span></button>
+      <button class="flex h-14 w-full items-center justify-between text-[15px] text-rose-600" data-act="reset"><span>重置演示数据</span><span class="text-zinc-300">${ic('right','size-4')}</span></button></div>
+    </div>`,
+
+  sheet_lib: () => sheet(`<h2 class="mb-4 text-[20px] font-bold">模块库</h2><div class="divide-y divide-zinc-100">${Object.entries(WIDGETS).map(([id,w])=>{ const on = S.layout.includes(id); return `<div class="flex items-center gap-3 py-3.5">
+      <div class="flex-1"><div class="text-[15px] font-semibold">${w.name}</div><div class="text-[13px] text-zinc-500">${w.desc}</div></div>
+      <button class="${PILL} ${on?'bg-zinc-100 text-zinc-400':'bg-zinc-900 text-white'}" data-act="libAdd" data-v="${id}" ${on?'disabled':''}>${on?'已添加':'添加'}</button></div>`; }).join('')}</div>`),
+
+  sheet_post: () => sheet(`<h2 class="mb-4 text-[20px] font-bold">发帖</h2>
+    <textarea id="postIn" rows="6" placeholder="说点真实的…" class="w-full resize-none rounded-2xl bg-zinc-100 p-4 text-[16px] leading-7 outline-none placeholder:text-zinc-400"></textarea>
+    <button class="${BTN} mt-4" data-act="sendPost">发布</button>`),
+
+  sheet_demo: () => sheet(`<div class="flex items-center justify-between"><h2 class="text-[20px] font-bold">隐藏画像</h2><span class="rounded-full bg-amber-400/15 px-3 py-1 text-[11px] font-medium text-amber-300">仅原型演示 · 用户不可见</span></div>
+    <div class="mt-5 flex items-end justify-between"><div><div class="text-[12px] text-white/50">综合积分</div>
+      <div class="text-[56px] font-bold leading-none tabular-nums tracking-tight ${S.score<PASS_LINE?'text-rose-400':'text-emerald-400'}">${S.score}</div></div>
+      <div class="pb-1 text-right text-[12px] text-white/50">淘汰线 ${PASS_LINE}<br><span class="text-[15px] font-semibold text-white">${S.score>=PASS_LINE?'高出 '+(S.score-PASS_LINE):'低于 '+(PASS_LINE-S.score)} 分</span></div></div>
+    <div class="relative mt-4 h-2 rounded-full bg-white/10"><div class="h-full rounded-full ${S.score<PASS_LINE?'bg-rose-400':'bg-emerald-400'}" style="width:${S.score}%"></div><div class="absolute -top-1 h-4 w-0.5 bg-white/60" style="left:${PASS_LINE}%"></div></div>
+    <div class="mt-6 grid grid-cols-2 gap-3">${[['a','是非分明'],['b','不损害他人'],['c','实事求是'],['d','正直善良']].map(([k,n])=>`<div class="rounded-2xl bg-white/[.06] p-4 ring-1 ring-white/10"><div class="text-[12px] text-white/50">${n}</div><div class="mt-1 text-[22px] font-bold tabular-nums">${S.dims[k]}</div>
+      <div class="mt-2 h-1 rounded-full bg-white/10"><div class="h-full rounded-full bg-white/70" style="width:${S.dims[k]}%"></div></div></div>`).join('')}</div>
+    <div class="mt-6 text-[12px] font-medium text-white/50">信号记录</div>
+    <div class="mt-2 divide-y divide-white/10">${S.logs.length?S.logs.map(l=>`<div class="flex gap-3 py-3"><span class="w-9 shrink-0 text-[14px] font-bold tabular-nums ${l.d>0?'text-emerald-400':l.d<0?'text-rose-400':'text-white/40'}">${l.d>0?'+':''}${l.d}</span>
+      <div class="min-w-0 text-[13px] leading-5"><div><span class="text-white/50">${esc(l.source)}</span> · ${esc(l.why)}</div>${l.text?`<div class="truncate text-white/40">“${esc(l.text)}”</div>`:''}</div></div>`).join(''):'<div class="py-3 text-[13px] text-white/40">暂无</div>'}</div>
+    <p class="mt-4 text-[12px] leading-5 text-white/40">试试在社区或 AI 对话里输入含"刷单""造谣""骗"的内容，观察扣分与淘汰。</p>`, true)
+};
+
+/* ---------- 桌面模块 ---------- */
+const CARD = 'h-full rounded-3xl p-5';
+const WT = 'text-[12px] font-semibold';
+const W = {
+  todo: () => { const left = S.todos.filter(t=>!t.d).length; return `<div class="${CARD} bg-white shadow-sm ring-1 ring-zinc-900/5">
+    <div class="flex items-baseline justify-between"><span class="${WT} text-zinc-400">待办清单</span><span class="text-[12px] text-zinc-400">${left} 项未完成</span></div>
+    <div class="mt-2">${S.todos.map((t,i)=>`<button class="flex w-full items-center gap-3 py-2 text-left" data-act="tg" data-v="${i}">
+      <span class="flex size-[22px] shrink-0 items-center justify-center rounded-full ${t.d?'bg-emerald-500 text-white':'ring-[1.5px] ring-zinc-300'}">${t.d?ic('check','size-3.5'):''}</span>
+      <span class="text-[15px] ${t.d?'text-zinc-400 line-through':''}">${esc(t.t)}</span></button>`).join('')}</div>
+    <div class="mt-2 flex h-10 items-center gap-2 rounded-full bg-zinc-100 pl-4 pr-1"><input id="todoIn" placeholder="添加一项" class="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-zinc-400">
+      <button class="flex size-8 items-center justify-center rounded-full bg-zinc-900 text-white" data-act="addTodo">${ic('plus','size-4')}</button></div></div>`; },
+  note: () => `<div class="${CARD} bg-amber-100"><div class="${WT} text-amber-700/70">随手记</div>
+    <textarea id="noteIn" rows="3" placeholder="写点什么…" class="mt-2 w-full resize-none bg-transparent text-[15px] leading-7 text-amber-950 outline-none placeholder:text-amber-700/40">${esc(S.note)}</textarea></div>`,
+  habit: () => `<div class="${CARD} flex min-h-40 flex-col bg-zinc-900 text-white"><div class="${WT} text-white/50">习惯打卡</div>
+    <div class="mt-2 flex-1"><span class="text-[44px] font-bold leading-none tabular-nums tracking-tight">${S.habit}</span><span class="ml-1 text-[13px] text-white/50">天</span></div>
+    <button class="h-9 rounded-full bg-white/15 text-[13px] font-semibold active:bg-white/25" data-act="habit">今日打卡</button></div>`,
+  quote: () => `<div class="${CARD} flex min-h-40 flex-col bg-emerald-600 text-white"><div class="${WT} text-white/60">每日一句</div>
+    <p class="mt-3 font-serif text-[17px] font-semibold leading-7">${QUOTES[new Date().getDate()%QUOTES.length]}</p></div>`,
+  hot: () => `<div class="${CARD} bg-white shadow-sm ring-1 ring-zinc-900/5"><div class="${WT} text-zinc-400">社区热帖</div>
+    <div class="mt-1 divide-y divide-zinc-100">${S.posts.slice().sort((a,b)=>b.likes-a.likes).slice(0,3).map((p,i)=>`<button class="flex w-full items-center gap-3 py-2.5 text-left" data-act="tab" data-v="community">
+      <span class="w-4 text-[15px] font-bold tabular-nums ${i===0?'text-rose-500':'text-zinc-300'}">${i+1}</span>
+      <span class="min-w-0 flex-1 truncate text-[14px]">${esc(p.text)}</span><span class="text-[12px] tabular-nums text-zinc-400">${p.likes}</span></button>`).join('')}</div></div>`,
+  count: () => { const d = Math.ceil((new Date(new Date().getFullYear()+1,0,1)-new Date())/864e5); return `<div class="${CARD} flex min-h-40 flex-col bg-indigo-600 text-white"><div class="${WT} text-white/60">倒计时</div>
+    <div class="mt-2 flex-1"><span class="text-[44px] font-bold leading-none tabular-nums tracking-tight">${d}</span><span class="ml-1 text-[13px] text-white/60">天</span></div><div class="text-[13px] text-white/70">距离元旦</div></div>`; },
+  ledger: () => `<div class="${CARD} flex min-h-40 flex-col bg-white shadow-sm ring-1 ring-zinc-900/5"><div class="${WT} text-zinc-400">今日支出</div>
+    <div class="mt-2 flex-1 text-[34px] font-bold leading-none tabular-nums tracking-tight"><span class="mr-0.5 text-[18px] text-zinc-400">¥</span>${S.ledger}</div>
+    <button class="h-9 rounded-full bg-zinc-100 text-[13px] font-semibold active:bg-zinc-200" data-act="spend">记一笔 ¥10</button></div>`
+};
+
+function render(){
+  $app.innerHTML = V[S.stage]() + (S.sheet ? V['sheet_'+S.sheet]() : '');
+  const c = document.getElementById('chatScroll'); if (c) c.scrollTop = c.scrollHeight;
+  save();
+}
+
+/* ---------- AI 对话（模拟） ---------- */
+function aiReply(text){
+  if (NEG.some(k => text.includes(k))) return {r:'ai', t:'这件事我帮不了，它可能会损害别人的利益。换个方向，我很乐意帮忙。'};
+  const id = Object.keys(WIDGET_KEYWORDS).find(k => WIDGET_KEYWORDS[k].some(w => text.toLowerCase().includes(w)));
+  if (id) return S.layout.includes(id)
+    ? {r:'ai', t:`你的桌面上已经有「${WIDGETS[id].name}」了。还想加点别的吗？`}
+    : {r:'ai', t:'明白，我为你准备了这个模块：', w:id};
+  return {r:'ai', t:'我在听。可以说得再具体一点，比如"我想要一个记账的模块"。'};
+}
+function sendChat(text){
+  text = text.trim(); if (!text) return;
+  S.chat.push({r:'me', t:text}); judge(text, 'AI 对话');
+  if (S.stage === 'main') S.chat.push(aiReply(text));
+  render();
+}
+
+/* ---------- 事件 ---------- */
+const val = id => (document.getElementById(id) || {value:''}).value.trim();
+const A = {
+  go: v => { S.stage = v; S.err = ''; },
+  agree: () => { S.agree = !S.agree; S.err = ''; },
+  startQuiz: () => {
+    S.err = !/^1\d{10}$/.test(S.phone) ? '请输入正确的 11 位手机号' : S.blocked.includes(S.phone) ? '该手机号已无法申请' : !S.agree ? '请先阅读并同意评估告知' : '';
+    if (!S.err) { S.stage = 'quiz'; S.qi = 0; S.answers = []; }
+  },
+  pick: v => { S.answers[S.qi] = +v; },
+  next: () => {
+    const q = QUIZ[S.qi];
+    if (q.type === 'open') { const t = val('open'); if (t.length < 8) return false; S.answers[S.qi] = t; }
+    else if (S.answers[S.qi] == null) return false;
+    if (S.qi < QUIZ.length - 1) { S.qi++; return; }
+    S.stage = 'judging';
+    setTimeout(() => {
+      const raw = QUIZ.reduce((s,q,i)=> s + (q.type==='choice' ? q.opts[S.answers[i]][1] : scoreOpen(S.answers[i])), 0);
+      S.score = Math.round(raw / (QUIZ.length*4) * 100);
+      S.dims = {a:S.score, b:S.score, c:S.score, d:S.score};
+      S.logs = [{d:S.score, source:'注册问答', why:`初始分（原始 ${raw}/${QUIZ.length*4}）`, text:''}];
+      if (S.score < PASS_LINE) { S.stage = 'rejected'; S.blocked.push(S.phone); } else { S.stage = 'main'; S.tab = 'home'; }
+      render();
+    }, 1600);
+  },
+  tab: v => { S.tab = v; S.edit = false; S.openCmt = null; },
+  edit: () => { S.edit = !S.edit; },
+  sheet: v => { S.sheet = v; },
+  closeSheet: () => { S.sheet = null; },
+  mv: v => { const [i,d] = v.split(',').map(Number), j = i + d; if (j<0||j>=S.layout.length) return false; [S.layout[i],S.layout[j]] = [S.layout[j],S.layout[i]]; },
+  rm: v => { S.layout.splice(+v,1); },
+  libAdd: v => { if (!S.layout.includes(v)) S.layout.push(v); },
+  addW: v => { const [id,i] = v.split(','); if (!S.layout.includes(id)) S.layout.push(id); S.chat[+i].done = true; S.chat.push({r:'ai', t:'已添加到桌面，返回桌面就能看到。'}); },
+  tg: v => { S.todos[+v].d = !S.todos[+v].d; },
+  addTodo: () => { const t = val('todoIn'); if (!t) return false; S.todos.push({t, d:false}); },
+  habit: () => { S.habit++; }, spend: () => { S.ledger += 10; },
+  like: v => { const p = S.posts.find(p=>p.id==v); p.liked = !p.liked; p.likes += p.liked?1:-1; },
+  cmt: v => { S.openCmt = S.openCmt==v ? null : +v; },
+  sendCmt: v => { const t = val('cmtIn'); if (!t) return false; S.posts.find(p=>p.id==v).cmts.push({name:S.name, text:t}); S.openCmt = null; judge(t, '社区评论'); },
+  sendPost: () => { const t = val('postIn'); if (!t) return false; S.posts.unshift({id:Date.now(), name:S.name, text:t, likes:0, liked:false, cmts:[], mine:true}); S.sheet = null; judge(t, '社区发帖'); },
+  send: () => { sendChat(val('chatIn')); return false; },
+  chip: v => { sendChat(v); return false; },
+  reset: () => { if (!confirm('清空所有演示数据并回到注册页？')) return false; localStorage.removeItem(KEY); S = fresh(); }
+};
+$app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  if (el.dataset.act === 'closeSheet' && e.target.closest('[data-stop]')) return;
+  if (A[el.dataset.act](el.dataset.v) !== false) render();
+});
+$app.addEventListener('input', e => {
+  if (e.target.id === 'phone') S.phone = e.target.value.trim();
+  if (e.target.id === 'noteIn') S.note = e.target.value;
+  if (e.target.id === 'nameIn') S.name = e.target.value || '新同志';
+  save();
+});
+$app.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  if (e.target.id === 'chatIn') sendChat(e.target.value);
+  if (e.target.id === 'todoIn' && A.addTodo() !== false) render();
+  if (e.target.id === 'cmtIn' && A.sendCmt(S.openCmt) !== false) render();
+});
+if (S.stage === 'judging') S.stage = 'quiz';
+if (!V['tab_'+S.tab] && S.tab !== 'ai') S.tab = 'home';
+render();
+</script>
+</body>
+</html>
