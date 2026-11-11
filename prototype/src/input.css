@@ -22,3 +22,19 @@ button { cursor: pointer; }
 .rise { animation: rise .28s ease-out both; }
 @keyframes sheet { from { transform: translateY(100%); } to { transform: none; } }
 .sheet-in { animation: sheet .28s cubic-bezier(.2,.8,.2,1) both; }
+
+/* Desktop edit mode (iOS home-screen style): #app[data-edit="true"] */
+#app:not([data-edit="true"]) .only-edit { display: none; }
+#app[data-edit="true"] .only-edit { display: flex; }
+#app[data-edit="true"] .not-edit { display: none; }
+.widget { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.widget input, .widget textarea { -webkit-user-select: text; user-select: text; }
+@keyframes jiggle { from { transform: rotate(-.7deg); } to { transform: rotate(.7deg); } }
+#app[data-edit="true"] .jig { pointer-events: none; animation: jiggle .16s ease-in-out infinite alternate; }
+#app[data-edit="true"] .widget:nth-child(even) .jig { animation-duration: .19s; animation-direction: alternate-reverse; }
+#app[data-edit="true"] .widget.col-span-2 .jig { animation-name: jiggle-wide; }
+@keyframes jiggle-wide { from { transform: rotate(-.35deg); } to { transform: rotate(.35deg); } }
+.widget.dragging { z-index: 30; pointer-events: none; filter: drop-shadow(0 18px 24px rgba(40,30,20,.22)); }
+.widget.dragging .jig { animation: none !important; }
+.widget.dragging [data-act="rm"] { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #app[data-edit="true"] .jig { animation: none; } }

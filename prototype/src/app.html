@@ -71,7 +71,7 @@ const PATHS = {
   chat:'<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 20.5l1.5-5.1A8.5 8.5 0 1 1 21 11.5z"/>',
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   spark:'<path d="M11 3l2 5.5L18.5 10.5 13 12.5 11 18l-2-5.5L3.5 10.5 9 8.5z"/><path d="M19 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M6 12h12"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>',
   up:'<path d="M12 19V5M6 11l6-6 6 6"/>', down:'<path d="M12 5v14M6 13l6 6 6-6"/>',
   left:'<path d="M15 5l-7 7 7 7"/>', right:'<path d="M9 5l7 7-7 7"/>',
   check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
@@ -194,18 +194,15 @@ const V = {
   tab_home: () => { const h = new Date().getHours(), d = new Date();
     return `<header class="px-7 pb-3 pt-14">
       <div class="flex items-center justify-between"><div class="font-serif text-[17px] text-stone-500 oldstyle-nums">${d.getMonth()+1} 月 ${d.getDate()} 日 · 星期${'日一二三四五六'[d.getDay()]}</div>
-        <div class="flex gap-2">${S.edit?`<button class="${PILL_LIGHT}" data-act="sheet" data-v="lib">${ic('plus','size-4')}添加</button>`:''}
-        <button class="${S.edit?PILL_DARK:PILL_LIGHT}" data-act="edit">${S.edit?'完成':'编辑'}</button></div></div>
+        <div class="flex gap-2"><button class="${PILL_LIGHT} only-edit" data-act="sheet" data-v="lib">${ic('plus','size-4')}添加</button>
+        <button class="${PILL_DARK} only-edit" data-act="edit">完成</button><button class="${PILL_LIGHT} not-edit" data-act="edit">编辑</button></div></div>
       <h1 class="${HEAD} mt-1">${h<6?'夜深了':h<12?'早上好':h<18?'下午好':'晚上好'}，${esc(S.name)}</h1></header>
-    <div class="no-bar flex-1 overflow-y-auto px-5 pb-36 pt-2"><div class="grid grid-flow-dense grid-cols-2 gap-3.5">
-      ${S.layout.map((id,i)=>`<div class="relative ${WIDGETS[id].wide?'col-span-2':''}">${W[id]()}
-        ${S.edit?`<div class="absolute -right-1 -top-2 flex gap-0.5 rounded-full bg-white p-1 shadow-lg shadow-stone-900/15">
-          <button class="flex size-7 items-center justify-center rounded-full text-stone-600 active:bg-stone-100" data-act="mv" data-v="${i},-1">${ic('up','size-4')}</button>
-          <button class="flex size-7 items-center justify-center rounded-full text-stone-600 active:bg-stone-100" data-act="mv" data-v="${i},1">${ic('down','size-4')}</button>
-          <button class="flex size-7 items-center justify-center rounded-full bg-stone-900 text-white" data-act="rm" data-v="${i}">${ic('x','size-4')}</button></div>`:''}</div>`).join('')}
+    <div id="deskScroll" data-blank class="no-bar flex-1 overflow-y-auto px-5 pb-36 pt-3"><div id="deskGrid" data-blank class="relative grid grid-flow-dense grid-cols-2 gap-3.5">
+      ${S.layout.map(id=>`<div class="widget relative ${WIDGETS[id].wide?'col-span-2':''}" data-wid="${id}"><div class="jig h-full">${W[id]()}</div>
+        <button class="only-edit absolute -left-2 -top-2 z-10 size-7 items-center justify-center rounded-full bg-stone-300/95 text-stone-800 shadow-md shadow-stone-900/15 backdrop-blur" data-act="rm" data-v="${id}" aria-label="删除${WIDGETS[id].name}">${ic('minus','size-4')}</button></div>`).join('')}
       </div>
-      ${S.layout.length?'':'<p class="mt-24 text-center font-serif text-[16px] leading-8 text-stone-400">桌面是空的<br>点"编辑"添加模块，或者告诉助手你想要什么</p>'}
-      <button class="mt-6 flex w-full items-center justify-center gap-1 font-serif text-[15px] text-stone-400" data-act="tab" data-v="ai">想要新的模块？告诉助手 ${ic('right','size-4')}</button></div>`; },
+      ${S.layout.length?'<p class="not-edit mt-6 text-center font-serif text-[13px] text-stone-400">长按任意模块可编辑桌面</p><p class="only-edit mt-6 justify-center text-center font-serif text-[13px] text-stone-400">拖动调整位置 · 点空白处完成</p>':'<p class="mt-24 text-center font-serif text-[16px] leading-8 text-stone-400">桌面是空的<br>点"编辑"添加模块，或者告诉助手你想要什么</p>'}
+      <button class="not-edit mt-3 flex w-full items-center justify-center gap-1 font-serif text-[15px] text-stone-400" data-act="tab" data-v="ai">想要新的模块？告诉助手 ${ic('right','size-4')}</button></div>`; },
 
   tab_community: () => `<header class="px-7 pb-5 pt-14">
       <div class="flex items-center justify-between"><div class="font-serif text-[17px] text-stone-500">说点真实的</div>
@@ -306,7 +303,10 @@ const W = {
 };
 
 function render(){
+  const top = (document.getElementById('deskScroll') || {}).scrollTop || 0;
+  $app.dataset.edit = S.edit && S.stage === 'main' && S.tab === 'home';
   $app.innerHTML = V[S.stage]() + (S.sheet ? V['sheet_'+S.sheet]() : '');
+  const desk = document.getElementById('deskScroll'); if (desk) desk.scrollTop = top;
   const c = document.getElementById('chatScroll'); if (c) c.scrollTop = c.scrollHeight;
   save();
 }
@@ -356,8 +356,7 @@ const A = {
   edit: () => { S.edit = !S.edit; },
   sheet: v => { S.sheet = v; },
   closeSheet: () => { S.sheet = null; },
-  mv: v => { const [i,d] = v.split(',').map(Number), j = i + d; if (j<0||j>=S.layout.length) return false; [S.layout[i],S.layout[j]] = [S.layout[j],S.layout[i]]; },
-  rm: v => { S.layout.splice(+v,1); },
+  rm: v => { S.layout = S.layout.filter(id => id !== v); },
   libAdd: v => { if (!S.layout.includes(v)) S.layout.push(v); },
   addW: v => { const [id,i] = v.split(','); if (!S.layout.includes(id)) S.layout.push(id); S.chat[+i].done = true; S.chat.push({r:'ai', t:'已添加到桌面，返回桌面就能看到。'}); },
   tg: v => { S.todos[+v].d = !S.todos[+v].d; },
@@ -371,6 +370,67 @@ const A = {
   chip: v => { sendChat(v); return false; },
   reset: () => { if (!confirm('清空所有演示数据并回到注册页？')) return false; localStorage.removeItem(KEY); S = fresh(); }
 };
+/* ---------- 桌面编辑：长按进入、拖动排序（参考 iOS 主屏幕） ---------- */
+let press = null, drag = null, swallowClick = false;
+const onDesk = () => S.stage === 'main' && S.tab === 'home' && !S.sheet;
+$app.addEventListener('pointerdown', e => {
+  if (!onDesk() || e.button || drag) return;
+  const w = e.target.closest('[data-wid]');
+  if (!w || e.target.closest('[data-act="rm"]')) return;
+  if (!S.edit && e.target.closest('input,textarea')) return;
+  const hold = !S.edit ? 450 : e.pointerType === 'mouse' ? 0 : 160;
+  clearTimeout(press && press.t);
+  press = {w, id:e.pointerId, x:e.clientX, y:e.clientY, t:setTimeout(startDrag, hold)};
+});
+function startDrag(){
+  const p = press; press = null; if (!p || !p.w.isConnected) return;
+  if (!S.edit) { S.edit = true; $app.dataset.edit = true; save(); if (navigator.vibrate) navigator.vibrate(12); }
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const r = p.w.getBoundingClientRect();
+  drag = {el:p.w, gx:p.x - r.left, gy:p.y - r.top, px:p.x, py:p.y, moved:false, last:null, lastT:0};
+  p.w.classList.add('dragging');
+  requestAnimationFrame(dragFrame);
+}
+function dragFrame(){
+  if (!drag) return;
+  const {el} = drag, grid = el.parentNode, sc = document.getElementById('deskScroll'), box = sc.getBoundingClientRect();
+  if (drag.py < box.top + 60) sc.scrollTop -= 9; else if (drag.py > box.bottom - 130) sc.scrollTop += 9;
+  const g = grid.getBoundingClientRect();
+  el.style.transform = `translate(${drag.px - drag.gx - g.left - el.offsetLeft}px,${drag.py - drag.gy - g.top - el.offsetTop}px) scale(1.03)`;
+  const hit = document.elementFromPoint(drag.px, drag.py), t = hit && hit.closest('[data-wid]'), now = Date.now();
+  if (t && t !== el && !(t === drag.last && now - drag.lastT < 350)) {
+    const others = [...grid.children].filter(c => c !== el), before = others.map(c => c.getBoundingClientRect());
+    if (el.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) t.after(el); else t.before(el);
+    others.forEach((c, i) => { const a = c.getBoundingClientRect(), dx = before[i].left - a.left, dy = before[i].top - a.top;
+      if (!dx && !dy) return;
+      c.style.transition = 'none'; c.style.transform = `translate(${dx}px,${dy}px)`; c.offsetWidth;
+      c.style.transition = 'transform .24s cubic-bezier(.2,.8,.2,1)'; c.style.transform = ''; });
+    drag.last = t; drag.lastT = now;
+  }
+  requestAnimationFrame(dragFrame);
+}
+addEventListener('pointermove', e => {
+  if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) { clearTimeout(press.t); press = null; }
+  if (drag) { if (Math.hypot(e.clientX - drag.px, e.clientY - drag.py) > 2) drag.moved = true; drag.px = e.clientX; drag.py = e.clientY; }
+});
+function endDrag(){
+  if (press) { clearTimeout(press.t); press = null; }
+  if (!drag) return;
+  const {el} = drag; drag = null;
+  el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; el.style.transform = '';
+  setTimeout(() => { el.classList.remove('dragging'); el.style.transition = ''; }, 200);
+  S.layout = [...el.parentNode.children].map(c => c.dataset.wid); save();
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
+}
+addEventListener('pointerup', endDrag);
+addEventListener('pointercancel', endDrag);
+document.addEventListener('touchmove', e => { if (drag && e.cancelable) e.preventDefault(); }, {passive:false});
+$app.addEventListener('contextmenu', e => { if (e.target.closest('[data-wid]')) e.preventDefault(); });
+$app.addEventListener('click', e => {
+  if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); return; }
+  if (S.edit && onDesk() && e.target.hasAttribute('data-blank')) { S.edit = false; render(); }
+}, true);
+
 $app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   if (el.dataset.act === 'closeSheet' && e.target.closest('[data-stop]')) return;
