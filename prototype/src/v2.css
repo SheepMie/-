@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@source "./v2.html";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display: "Outfit", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  --color-ink: #0e0e10;
+  --color-panel: #19191d;
+  --color-panel2: #26262b;
+  --color-lime: #d7f36b;
+  --color-pink: #ffb3d1;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+.no-bar::-webkit-scrollbar { display: none; }
+.no-bar { scrollbar-width: none; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .28s ease-out both; }
+@keyframes sheet { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-in { animation: sheet .28s cubic-bezier(.2,.8,.2,1) both; }
+
+/* Desktop edit mode: #app[data-edit="true"] */
+#app:not([data-edit="true"]) .only-edit { display: none; }
+#app[data-edit="true"] .only-edit { display: flex; }
+#app[data-edit="true"] .not-edit { display: none; }
+.widget { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.widget input, .widget textarea { -webkit-user-select: text; user-select: text; }
+.wbody { transition: transform .2s, opacity .2s; }
+#app[data-edit="true"] #deskGrid { row-gap: 3.75rem; padding-bottom: 3rem; }
+#app[data-edit="true"] .wbody { pointer-events: none; outline: 2px dashed rgba(255,255,255,.28); outline-offset: 4px; }
+.tool { display: flex; width: 2.25rem; height: 2.25rem; align-items: center; justify-content: center; border-radius: 9999px; }
+.tool:active { background: rgba(0,0,0,.08); }
+.widget.dragging { z-index: 30; pointer-events: none; filter: drop-shadow(0 20px 28px rgba(0,0,0,.6)); }
+.widget.dragging .wbody { outline-color: transparent; }
+.widget.dragging .only-edit { opacity: 0; }

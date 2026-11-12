@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0e10">
+<title>同道 · 原型预览（第二版）</title>
+<style>/*__FONT__*//*__CSS__*/</style>
+</head>
+<body class="h-dvh bg-black font-sans text-white antialiased">
+<div id="app" class="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-ink"></div>
+<script>
+/* ============ 原型说明（第二版：深色色块风格） ============
+   纯前端演示：所有"AI 评估"都是本地关键词规则模拟，正式版由后端大模型完成。
+   "我的"页里的"隐藏画像"入口仅供产品方查看，真实用户端不存在该入口。
+   样式使用 Tailwind CSS，修改后运行 npm run build 重新生成 v2.html。 */
+const PASS_LINE = 50;
+const KEY = 'tongdao_proto_b1';
+
+const QUIZ = [
+  {type:'choice', q:'你发现一位平时很照顾你的同事，在报销单里多报了 200 元。你会？',
+   opts:[['装作没看见，不关我的事',1],['私下提醒他改正',4],['直接向上级反映',3],['既然没人查，我下次也多报一点',0]]},
+  {type:'choice', q:'你在网上看到一条让人很气愤的消息，但没有任何来源。你会？',
+   opts:[['立刻转发，让更多人知道',0],['转发并注明"不确定真假"',2],['与我无关，划走',2],['先查证，确认后再决定是否转发',4]]},
+  {type:'choice', q:'你要卖掉一部二手手机，屏幕有一处买家很难发现的暗伤。你会？',
+   opts:[['主动说明，并适当让价',4],['不提，对方没发现就算了',0],['对方问到再说',2],['只写"成色如图"',1]]},
+  {type:'choice', q:'小组项目交付后，你发现一个关键错误是自己造成的，目前没人知道。你会？',
+   opts:[['等别人发现了再说',1],['悄悄改掉，不声张',2],['主动说明并负责补救',4],['暗示可能是别人的环节出了问题',0]]},
+  {type:'open', q:'"善意的谎言"违背实事求是吗？请写出你的立场和理由。'}
+];
+
+/* 模块类型：sizes 为可选尺寸（s = 半宽，w = 整行） */
+const TYPES = {
+  todo:   {name:'待办清单', desc:'记录要做的事',       sizes:['w'],     color:'cream', keys:['待办','任务','清单','todo','计划']},
+  habit:  {name:'习惯打卡', desc:'每天点一下，累计天数', sizes:['s','w'], color:'lav',   keys:['打卡','习惯','坚持','早起','运动']},
+  count:  {name:'倒计时',   desc:'距离重要日子还有几天', sizes:['s','w'], color:'lime',  keys:['倒计时','纪念日','还有几天','考试']},
+  ledger: {name:'记账',     desc:'快速记一笔支出',     sizes:['s','w'], color:'peach', keys:['记账','花销','支出','账本','花了']},
+  note:   {name:'随手记',   desc:'一块自由书写的便签',  sizes:['w'],     color:'sky',   keys:['笔记','便签','记录','随手记','备忘']},
+  quote:  {name:'一句话',   desc:'每日一句，或写下自己的', sizes:['w','s'], color:'graphite', keys:['一句','语录','名言','座右铭']},
+  hot:    {name:'社区热帖', desc:'社区里正在讨论什么',  sizes:['w'],     color:'graphite', keys:['热帖','社区','热门']}
+};
+const COLORS = {lime:['#d7f36b','#14150c'], lav:['#c9b8ff','#15121f'], peach:['#ffc9a3','#1f150e'], sky:['#a9dcff','#0d1820'],
+  pink:['#ffb3d1','#200f17'], cream:['#f4efe4','#171612'], graphite:['#232328','#f4f4f1']};
+const nextYear = new Date().getFullYear() + 1;
+let seq = Date.now();
+const mk = (type, o={}) => Object.assign({k:'w' + (seq++).toString(36), type, size:TYPES[type].sizes[0], color:TYPES[type].color, title:TYPES[type].name,
+  d: type==='todo' ? {items:[]} : type==='count' ? {date:nextYear+'-01-01'} : type==='ledger' ? {total:0, step:10} : type==='habit' ? {n:0} : {text:''}}, o);
+
+const QUOTES = ['知之为知之，不知为不知，是知也。','勿以恶小而为之，勿以善小而不为。','言必信，行必果。','实事求是，是一切工作的出发点。'];
+const SEED_POSTS = [
+  {id:2, name:'林夏', time:'12 分钟前', text:'求教：公司让我在数据报告里"优化"一下口径，实际就是把不好看的数字藏起来。大家遇到过吗，怎么处理的？', likes:41, liked:false, cmts:[{name:'老周',text:'如实写，另附一页说明口径差异，让领导自己选。'}]},
+  {id:1, name:'老周', time:'1 小时前', text:'今天在菜市场多找了我 20 块，走出两条街才发现，又折回去还了。摊主愣了半天。分享一下，没别的意思。', likes:23, liked:false, cmts:[{name:'阿青',text:'这种小事最见人品。'}]},
+  {id:3, name:'阿青', time:'3 小时前', text:'推荐一个核实消息来源的小习惯：转发前先搜一下原始出处，找不到就不转。', likes:17, liked:false, cmts:[]}
+];
+
+const fresh = () => ({
+  stage:'welcome', phone:'', agree:false, err:'', qi:0, answers:[], blocked:[],
+  score:0, dims:{a:50,b:50,c:50,d:50}, logs:[],
+  tab:'home', edit:false, page:0, cfgK:null,
+  pages:[
+    {name:'主页', items:[mk('quote'), mk('count',{title:'元旦',size:'s'}), mk('habit',{title:'早起'}),
+      mk('todo',{d:{items:[{t:'看看社区的新帖子',d:false},{t:'长按模块，试试编辑桌面',d:false}]}})]},
+    {name:'工作', items:[mk('note',{title:'会议记录'}), mk('ledger',{title:'午餐'}), mk('count',{title:'项目交付',size:'s',color:'pink',d:{date:nextYear+'-03-01'}})]}
+  ],
+  posts:JSON.parse(JSON.stringify(SEED_POSTS)), openCmt:null,
+  chat:[{r:'ai',t:'你好，我是你的助手。\n告诉我你想在桌面上放一个什么样的功能，我来帮你添加。'}],
+  sheet:null, name:'新同志'
+});
+let S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || '{}'));
+const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $app = document.getElementById('app');
+const page = () => S.pages[S.page] || S.pages[0];
+const item = k => { for (const p of S.pages) { const i = p.items.find(i => i.k === k); if (i) return i; } };
+
+/* ---------- 图标 ---------- */
+const PATHS = {
+  home:'<rect x="3.500" y="3.500" width="7" height="7" rx="2"/><rect x="13.500" y="3.500" width="7" height="7" rx="2"/><rect x="3.500" y="13.500" width="7" height="7" rx="2"/><rect x="13.500" y="13.500" width="7" height="7" rx="2"/>',
+  chat:'<path d="M21 11.500a8.500 8.500 0 0 1-12.400 7.500L3 20.500l1.500-5.100A8.500 8.500 0 1 1 21 11.500z"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  spark:'<path d="M11 3l2 5.500L18.500 10.500 13 12.500 11 18l-2-5.500L3.500 10.500 9 8.500z"/><path d="M19 15.500l.8 2.200 2.200.8-2.200.8-.8 2.200-.8-2.200-2.200-.8 2.200-.8z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  left:'<path d="M15 5l-7 7 7 7"/>', right:'<path d="M9 5l7 7-7 7"/>', check:'<path d="M5 12.500l4.500 4.500L19 7.500"/>',
+  heart:'<path d="M12 20.500s-8-4.900-8-11A4.500 4.500 0 0 1 12 7a4.500 4.500 0 0 1 8 2.500c0 6.100-8 11-8 11z"/>',
+  bubble:'<path d="M4 5h16v11H9l-5 4z"/>', edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.500"/><circle cx="8" cy="17" r="2.500"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6.500 7l1 13h9l1-13"/>',
+  resize:'<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>',
+  drop:'<path d="M12 3s6 6.500 6 11a6 6 0 0 1-12 0c0-4.500 6-11 6-11z"/>'
+};
+const ic = (n, cls='size-5', fill='none') => `<svg class="${cls} shrink-0" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PATHS[n]}</svg>`;
+
+/* ---------- 模拟评估（正式版替换为大模型） ---------- */
+const NEG = ['骗','刷单','造谣','假货','坑人','傻','滚','蠢','钻空子','薅','报复','伪造','代考','水军'];
+const POS = ['谢谢','感谢','抱歉','对不起','来源','查证','核实','如实','帮忙','分享','承认','改正','道歉','事实'];
+function scoreOpen(t){
+  t = t.trim(); if (t.length < 8) return 0;
+  let s = t.length >= 60 ? 3 : t.length >= 25 ? 2 : 1;
+  if (/因为|所以|但是|如果|理由|我认为|不过|然而/.test(t)) s += 1;
+  if (NEG.some(k => t.includes(k)) && !/不应|不能|反对|不该/.test(t)) s -= 1;
+  return Math.max(0, Math.min(4, s));
+}
+function judge(text, source){
+  const neg = NEG.filter(k => text.includes(k)), pos = POS.filter(k => text.includes(k));
+  let d = 0, why = '中性内容';
+  if (neg.length){ d = -Math.min(12, 6 * neg.length); why = '疑似不当倾向：' + neg.join('、'); }
+  else if (pos.length){ d = Math.min(3, pos.length); why = '正向信号：' + pos.join('、'); }
+  else if (text.length > 40){ d = 1; why = '认真表达'; }
+  S.score = Math.max(0, Math.min(100, S.score + d));
+  if (d){ const k = 'abcd'[Math.floor(Math.random()*4)]; S.dims[k] = Math.max(0, Math.min(100, S.dims[k] + d * 2)); }
+  S.logs.unshift({d, source, why, text:text.slice(0,30)});
+  S.logs = S.logs.slice(0, 40);
+  if (S.stage === 'main' && S.score < PASS_LINE){ S.stage = 'banned'; S.sheet = null; S.blocked.push(S.phone); }
+}
+
+/* ---------- 通用片段 ---------- */
+const BTN = 'flex h-14 w-full items-center justify-center rounded-2xl bg-lime text-[17px] font-bold text-ink transition active:scale-[.98]';
+const CHIP = 'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold transition active:scale-95';
+const HEAD = 'text-[34px] font-black leading-tight tracking-tight';
+const NUM = 'font-display font-bold tabular-nums tracking-tight';
+const FIELD = 'flex h-14 items-center rounded-2xl bg-panel px-4 ring-1 ring-white/10 focus-within:ring-2 focus-within:ring-lime';
+const INPUT = 'h-12 w-full rounded-xl bg-panel2 px-4 text-[16px] outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-2 focus:ring-lime';
+const tint = c => `background:${COLORS[c][0]};color:${COLORS[c][1]}`;
+const inv = c => `background:${COLORS[c][1]};color:${COLORS[c][0]}`;
+const AV = ['lime','lav','peach','sky','pink'];
+const avatar = (name, size='size-10 text-[15px]') => `<div class="flex ${size} shrink-0 items-center justify-center rounded-2xl font-bold" style="${tint(AV[(name.charCodeAt(0)||0) % AV.length])}">${esc(name[0])}</div>`;
+const endPage = (title, body) => `<div class="flex flex-1 flex-col justify-center px-8 rise">
+  <div class="mb-6 flex size-16 items-center justify-center rounded-3xl bg-panel2 text-white/50">${ic('x','size-8')}</div>
+  <h2 class="${HEAD}">${title}</h2><p class="mt-4 text-[15px] leading-7 text-white/50">${body}</p>
+  <div class="mt-16 flex gap-2 text-[12px] text-white/40"><button class="rounded-full bg-panel2 px-3 py-2" data-act="sheet" data-v="demo">查看隐藏画像（演示）</button><button class="rounded-full bg-panel2 px-3 py-2" data-act="reset">重置演示</button></div></div>`;
+let animSheet = false;
+const sheet = inner => `<div class="absolute inset-0 z-40 flex items-end bg-black/60" data-act="closeSheet">
+  <div class="${animSheet?'sheet-in':''} no-bar max-h-[88%] w-full overflow-y-auto rounded-t-[32px] bg-panel px-5 pb-9 pt-3" data-stop>
+  <div class="mx-auto mb-5 h-1 w-10 rounded-full bg-white/20"></div>${inner}</div></div>`;
+
+/* ---------- 视图 ---------- */
+const V = {
+  welcome: () => `<div class="flex flex-1 flex-col px-6 pb-9 pt-20">
+    <div class="flex-1 rise">
+      <div class="inline-flex h-8 items-center rounded-full bg-panel2 px-3 text-[12px] font-medium text-white/60">邀请制 · AI 准入评估</div>
+      <h1 class="mt-5 text-[76px] font-black leading-none tracking-tight">同道</h1>
+      <p class="mt-5 text-[17px] leading-8 text-white/50">一个只为同道中人准备的地方。<br>在这里，大家说真话，做实事。</p>
+      <div class="mt-9 grid grid-cols-2 gap-3">
+        ${[['是非分明','lime'],['不损害他人','lav'],['实事求是','peach'],['正直善良','sky']].map(([t,c],i)=>`<div class="flex h-24 items-end rounded-3xl p-4 text-[18px] font-bold" style="${tint(c)}"><span><span class="${NUM} block text-[12px] opacity-50">0${i+1}</span>${t}</span></div>`).join('')}
+      </div>
+    </div>
+    <button class="${BTN}" data-act="go" data-v="phone">申请加入</button>
+    <p class="mt-4 text-center text-[12px] text-white/35">需回答 5 道问题，由 AI 评估是否与社区宗旨相符</p></div>`,
+
+  phone: () => `<div class="no-bar flex flex-1 flex-col overflow-y-auto px-6 pb-9 pt-14 rise">
+    <button class="mb-7 flex size-11 items-center justify-center rounded-2xl bg-panel2" data-act="go" data-v="welcome">${ic('left')}</button>
+    <h1 class="${HEAD}">手机号注册</h1><p class="mt-2 text-[15px] text-white/50">一个手机号只有一次申请机会</p>
+    <div class="mt-7 space-y-3">
+      <div class="${FIELD}"><span class="${NUM} border-r border-white/10 pr-3 text-[16px] text-white/50">+86</span>
+        <input id="phone" type="tel" maxlength="11" placeholder="请输入手机号" value="${esc(S.phone)}" class="${NUM} h-full min-w-0 flex-1 bg-transparent pl-3 text-[18px] outline-none placeholder:font-sans placeholder:text-[16px] placeholder:font-normal placeholder:text-white/30"></div>
+      <div class="${FIELD}"><input placeholder="验证码（演示可不填）" class="h-full min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-white/30">
+        <span class="shrink-0 whitespace-nowrap text-[14px] font-semibold text-lime">获取验证码</span></div>
+    </div>
+    <div class="mt-5 rounded-3xl p-5" style="${tint('lav')}">
+      <div class="text-[16px] font-bold">评估告知</div>
+      <p class="mt-2 text-[13px] leading-6 opacity-75">本应用会收集你的注册问答，以及使用过程中的发帖、评论、与 AI 助手的对话等行为，用于持续评估你是否符合社区宗旨。评估由 AI 完成，结果会影响你能否继续使用，具体内容不向用户展示。</p>
+    </div>
+    <button class="mt-5 flex items-start gap-3 text-left" data-act="agree">
+      <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg ${S.agree?'bg-lime text-ink':'bg-panel2 ring-1 ring-white/20'}">${S.agree?ic('check','size-4'):''}</span>
+      <span class="text-[13px] leading-6 text-white/60">我已阅读并同意《用户协议》《隐私政策》及上述评估告知</span></button>
+    <div class="flex-1"></div>
+    <p class="mb-3 mt-6 min-h-5 text-center text-[13px] text-pink">${esc(S.err)}</p>
+    <button class="${BTN}" data-act="startQuiz">开始答题</button></div>`,
+
+  quiz: () => { const q = QUIZ[S.qi], a = S.answers[S.qi];
+    return `<div class="flex flex-1 flex-col overflow-hidden px-6 pb-9 pt-16">
+    <div class="flex items-center gap-3"><div class="flex flex-1 gap-1.5">${QUIZ.map((_,i)=>`<div class="h-1.5 flex-1 rounded-full ${i<=S.qi?'bg-lime':'bg-panel2'}"></div>`).join('')}</div>
+      <div class="${NUM} text-[14px] text-white/50">${S.qi+1}/${QUIZ.length}</div></div>
+    <div class="no-bar -mx-1 flex-1 overflow-y-auto px-1 rise">
+      <div class="mt-7 inline-flex h-7 items-center rounded-full bg-panel2 px-3 text-[12px] font-medium text-white/60">${q.type==='choice'?'选择题':'回答题'}</div>
+      <h2 class="mt-3 text-[23px] font-bold leading-9 tracking-tight">${q.q}</h2>
+      <div class="mt-6 space-y-2.5 pb-2">
+      ${q.type==='choice' ? q.opts.map((o,i)=>`<button class="flex w-full items-center gap-3 rounded-2xl p-4 text-left transition active:scale-[.99] ${a===i?'bg-lime text-ink':'bg-panel ring-1 ring-white/10'}" data-act="pick" data-v="${i}">
+          <span class="${NUM} flex size-8 shrink-0 items-center justify-center rounded-xl text-[14px] ${a===i?'bg-ink text-lime':'bg-panel2 text-white/50'}">${'ABCD'[i]}</span>
+          <span class="text-[15px] font-medium leading-6">${o[0]}</span></button>`).join('')
+        : `<textarea id="open" rows="8" placeholder="请认真作答，没有标准答案" class="w-full resize-none rounded-2xl bg-panel p-4 text-[16px] leading-7 outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-2 focus:ring-lime">${esc(a||'')}</textarea>
+           <p class="text-[12px] text-white/35">至少 8 个字。AI 会阅读你的理由，而不只是立场。</p>`}
+      </div></div>
+    <button class="${BTN} mt-4" data-act="next">${S.qi===QUIZ.length-1?'提交评估':'下一题'}</button></div>`; },
+
+  judging: () => `<div class="flex flex-1 flex-col items-center justify-center">
+    <div class="grid size-24 animate-spin grid-cols-2 gap-2 [animation-duration:2.4s]">${['lime','lav','peach','sky'].map(c=>`<div class="rounded-2xl" style="background:${COLORS[c][0]}"></div>`).join('')}</div>
+    <h2 class="mt-10 text-[22px] font-bold">正在评估</h2><p class="mt-2 text-[14px] text-white/50">AI 正在阅读你的回答</p></div>`,
+
+  rejected: () => endPage('很遗憾，<br>未能通过', '根据 AI 评估，你暂不符合本应用的加入条件。该手机号无法再次申请。'),
+  banned: () => endPage('账号已停用', '根据持续评估，你的使用行为已不符合社区宗旨，无法继续使用本应用。'),
+
+  main: () => S.tab === 'ai' ? V.ai() : `${V['tab_'+S.tab]()}
+    <div class="not-edit pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-ink from-40% to-transparent px-5 pb-7 pt-10">
+      <nav class="pointer-events-auto flex h-16 w-full items-center rounded-[26px] bg-panel2 p-1.5 ring-1 ring-white/10">
+      ${[['home','home','桌面'],['community','chat','社区'],['ai','spark','助手'],['me','user','我的']].map(([k,i,n])=>`<button class="flex h-full flex-1 items-center justify-center gap-1.5 rounded-[20px] text-[14px] font-bold transition ${S.tab===k?'bg-lime text-ink':'text-white/40'}" data-act="tab" data-v="${k}">${ic(i)}${S.tab===k?n:''}</button>`).join('')}
+      </nav></div>`,
+
+  tab_home: () => { const h = new Date().getHours(), d = new Date(), p = page();
+    return `<header class="px-5 pb-3 pt-14">
+      <div class="flex items-center justify-between"><div><div class="${NUM} text-[13px] font-medium text-white/40">${d.getMonth()+1}.${d.getDate()} 周${'日一二三四五六'[d.getDay()]}</div>
+        <h1 class="text-[26px] font-black leading-tight tracking-tight">${h<6?'夜深了':h<12?'早上好':h<18?'下午好':'晚上好'}，${esc(S.name)}</h1></div>
+        <button class="${CHIP} not-edit bg-panel2 text-white ring-1 ring-white/10" data-act="edit">${ic('sliders','size-4')}编辑</button>
+        <button class="${CHIP} only-edit bg-lime text-ink" data-act="edit">${ic('check','size-4')}完成</button></div>
+      <div class="no-bar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5">
+        ${S.pages.map((pg,i)=>`<button class="${CHIP} h-9 ${i===S.page?'bg-white text-ink':'bg-panel2 text-white/50'}" data-act="page" data-v="${i}" ${i===S.page?'id="pageChip"':''}>${esc(pg.name)}</button>`).join('')}
+        <button class="${CHIP} h-9 w-9 justify-center bg-panel2 px-0 text-white/50" data-act="addPage" aria-label="新建页面">${ic('plus','size-4')}</button></div></header>
+    <div id="deskScroll" data-blank class="no-bar flex-1 overflow-y-auto px-5 pb-56 pt-3"><div id="deskGrid" data-blank class="relative grid grid-flow-dense grid-cols-2 gap-3">
+      ${p.items.map(it=>{ const T = TYPES[it.type]; return `<div class="widget relative ${it.size==='w'?'col-span-2':''}" data-wid="${it.k}"><div class="wbody h-full rounded-[28px] p-5" style="${tint(it.color)}">${W[it.type](it)}</div>
+        <div class="only-edit absolute inset-x-0 top-full z-10 justify-center pt-2"><div class="flex gap-0.5 rounded-full bg-white p-1 text-ink shadow-lg shadow-black/40">
+          ${T.sizes.length>1?`<button class="tool" data-act="wSize" data-v="${it.k}" aria-label="切换尺寸">${ic('resize','size-4')}</button>`:''}
+          <button class="tool" data-act="wColor" data-v="${it.k}" aria-label="换颜色"><span class="size-4 rounded-full ring-2 ring-ink/15" style="background:${COLORS[it.color][0]}"></span></button>
+          <button class="tool" data-act="wCfg" data-v="${it.k}" aria-label="设置">${ic('sliders','size-4')}</button>
+          <button class="tool bg-ink text-white" data-act="wDel" data-v="${it.k}" aria-label="删除">${ic('trash','size-4')}</button></div></div></div>`; }).join('')}
+      <button class="not-edit col-span-2 flex h-16 items-center justify-center gap-2 rounded-[28px] border-2 border-dashed border-white/15 text-[15px] font-semibold text-white/40" data-act="edit">${ic('plus','size-5')}添加模块</button>
+      </div>
+      <p class="not-edit mt-5 text-center text-[12px] text-white/30">长按任意模块，进入编辑</p></div>
+    <div class="only-edit absolute inset-x-0 bottom-0 z-20 flex-col rounded-t-[28px] bg-panel px-5 pb-7 pt-4 shadow-[0_-12px_40px_rgba(0,0,0,.6)] ring-1 ring-white/10">
+      <div class="flex items-center gap-2"><span class="shrink-0 text-[12px] font-medium text-white/40">页面</span>
+        <input id="pageName" value="${esc(p.name)}" maxlength="8" class="h-10 min-w-0 flex-1 rounded-xl bg-panel2 px-3 text-[15px] font-semibold outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-lime">
+        <button class="${CHIP} bg-panel2 px-3 text-white/60 disabled:opacity-30" data-act="delPage" ${S.pages.length<2?'disabled':''}>${ic('trash','size-4')}删除页面</button></div>
+      <div class="mt-4 text-[12px] font-medium text-white/40">点一下添加模块 · 拖动模块调整位置</div>
+      <div class="no-bar -mx-5 mt-2 flex gap-2 overflow-x-auto px-5">${Object.entries(TYPES).map(([t,T])=>`<button class="flex h-16 w-24 shrink-0 flex-col justify-between rounded-2xl p-2.5 text-left transition active:scale-95" style="${tint(T.color)}" data-act="add" data-v="${t}">
+        ${ic('plus','size-4')}<span class="text-[13px] font-bold">${T.name}</span></button>`).join('')}</div></div>`; },
+
+  tab_community: () => `<header class="flex items-end justify-between px-5 pb-4 pt-14">
+      <div><div class="text-[13px] font-medium text-white/40">说点真实的</div><h1 class="${HEAD}">社区</h1></div>
+      <button class="${CHIP} bg-lime text-ink" data-act="sheet" data-v="post">${ic('edit','size-4')}发帖</button></header>
+    <div class="no-bar flex-1 space-y-3 overflow-y-auto px-5 pb-32">${S.posts.map(p=>`<article class="rounded-[28px] bg-panel p-5 ring-1 ring-white/5">
+      <div class="flex items-center gap-3">${avatar(p.name)}
+        <div><div class="text-[15px] font-bold">${esc(p.name)}</div><div class="text-[12px] text-white/40">${esc(p.time||'刚刚')}</div></div></div>
+      <p class="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">${esc(p.text)}</p>
+      <div class="${NUM} mt-4 flex gap-2 text-[13px]">
+        <button class="flex h-9 items-center gap-1.5 rounded-full px-3.5 ${p.liked?'bg-pink text-ink':'bg-panel2 text-white/60'}" data-act="like" data-v="${p.id}">${ic('heart','size-4',p.liked?'currentColor':'none')}${p.likes}</button>
+        <button class="flex h-9 items-center gap-1.5 rounded-full bg-panel2 px-3.5 font-sans font-semibold text-white/60" data-act="cmt" data-v="${p.id}">${ic('bubble','size-4')}${p.cmts.length||'评论'}</button></div>
+      ${p.cmts.length?`<div class="mt-4 space-y-2">${p.cmts.map(c=>`<div class="rounded-2xl bg-panel2 px-4 py-3 text-[14px] leading-6"><span class="font-bold">${esc(c.name)}</span><span class="ml-2 break-words text-white/70">${esc(c.text)}</span></div>`).join('')}</div>`:''}
+      ${S.openCmt===p.id?`<div class="mt-3 flex h-12 items-center gap-2 rounded-2xl bg-panel2 pl-4 pr-1.5 ring-1 ring-white/10"><input id="cmtIn" placeholder="写下你的看法" class="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-white/30">
+        <button class="flex size-9 items-center justify-center rounded-xl bg-lime text-ink" data-act="sendCmt" data-v="${p.id}">${ic('up','size-4')}</button></div>`:''}
+    </article>`).join('')}</div>`,
+
+  ai: () => `<header class="flex items-center gap-3 px-5 pb-4 pt-14">
+      <button class="flex size-11 items-center justify-center rounded-2xl bg-panel2" data-act="tab" data-v="home">${ic('left')}</button>
+      <div class="flex size-11 items-center justify-center rounded-2xl bg-lime text-ink">${ic('spark')}</div>
+      <div><div class="text-[17px] font-bold">助手</div><div class="text-[12px] text-white/40">描述你想要的功能，添加到「${esc(page().name)}」</div></div></header>
+    <div class="no-bar flex-1 space-y-2.5 overflow-y-auto px-5 py-2" id="chatScroll">
+      ${S.chat.map((m,i)=>m.r==='me'
+        ? `<div class="flex justify-end"><div class="max-w-[82%] whitespace-pre-wrap break-words rounded-3xl rounded-br-lg bg-lime px-4 py-3 text-[15px] font-medium leading-6 text-ink">${esc(m.t)}</div></div>`
+        : `<div class="flex"><div class="max-w-[86%] whitespace-pre-wrap break-words rounded-3xl rounded-bl-lg bg-panel px-4 py-3 text-[15px] leading-6 text-white/90 ring-1 ring-white/5">${esc(m.t)}${m.w?`<div class="mt-3 flex items-center gap-3 rounded-2xl p-3" style="${tint(TYPES[m.w].color)}"><div class="flex-1"><div class="text-[15px] font-bold">${TYPES[m.w].name}</div><div class="text-[12px] opacity-60">${TYPES[m.w].desc}</div></div>
+            <button class="h-9 shrink-0 rounded-full px-4 text-[13px] font-bold ${m.done?'opacity-40':''}" style="${inv(TYPES[m.w].color)}" data-act="addW" data-v="${m.w},${i}" ${m.done?'disabled':''}>${m.done?'已添加':'添加'}</button></div>`:''}</div></div>`).join('')}
+    </div>
+    <div class="no-bar flex gap-2 overflow-x-auto px-5 py-3">${['我想要一个记账的模块','加一个考试倒计时','帮我加个习惯打卡','我想记点笔记'].map(t=>`<button class="h-9 shrink-0 rounded-full bg-panel2 px-4 text-[13px] font-medium text-white/70" data-act="chip" data-v="${t}">${t}</button>`).join('')}</div>
+    <div class="px-5 pb-8"><div class="flex h-14 items-center gap-2 rounded-2xl bg-panel2 pl-5 pr-2 ring-1 ring-white/10">
+      <input id="chatIn" placeholder="说说你想要的功能…" class="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-white/30">
+      <button class="flex size-10 items-center justify-center rounded-xl bg-lime text-ink" data-act="send">${ic('up','size-[18px]')}</button></div></div>`,
+
+  tab_me: () => `<header class="px-5 pb-4 pt-14"><div class="text-[13px] font-medium text-white/40">个人信息</div><h1 class="${HEAD}">我的</h1></header>
+    <div class="no-bar flex-1 space-y-3 overflow-y-auto px-5 pb-32">
+    <div class="flex items-center gap-4 rounded-[28px] p-5" style="${tint('lime')}">
+      <div class="flex size-16 shrink-0 items-center justify-center rounded-3xl text-[26px] font-black" style="${inv('lime')}">${esc(S.name[0])}</div>
+      <div class="min-w-0 flex-1"><input id="nameIn" value="${esc(S.name)}" maxlength="12" class="w-full bg-transparent text-[22px] font-black outline-none">
+      <div class="${NUM} mt-0.5 text-[14px] font-medium opacity-60">${esc(S.phone.slice(0,3))} **** ${esc(S.phone.slice(-4))}</div></div>
+      <span class="opacity-50">${ic('edit','size-4')}</span></div>
+    <div class="grid grid-cols-3 gap-3">${[[S.posts.filter(p=>p.mine).length,'帖子','lav'],[S.pages.length,'桌面页','peach'],[S.pages.reduce((n,p)=>n+p.items.length,0),'模块','sky']].map(([n,l,c])=>`<div class="rounded-3xl p-4" style="${tint(c)}"><div class="${NUM} text-[30px] leading-9">${n}</div><div class="text-[12px] font-semibold opacity-60">${l}</div></div>`).join('')}</div>
+    <div class="divide-y divide-white/5 rounded-[28px] bg-panel px-5 text-[15px] font-medium ring-1 ring-white/5">
+      ${['评估说明','用户协议','隐私政策'].map(t=>`<div class="flex h-14 items-center justify-between"><span>${t}</span><span class="text-white/25">${ic('right','size-4')}</span></div>`).join('')}
+      <button class="flex h-14 w-full items-center justify-between" data-act="sheet" data-v="demo"><span>隐藏画像<span class="ml-2 rounded-full bg-panel2 px-2 py-0.5 text-[11px] text-white/50">仅原型演示</span></span><span class="text-white/25">${ic('right','size-4')}</span></button>
+      <button class="flex h-14 w-full items-center justify-between text-pink" data-act="reset"><span>重置演示数据</span><span class="text-white/25">${ic('right','size-4')}</span></button></div>
+    </div>`,
+
+  sheet_cfg: () => { const it = item(S.cfgK); if (!it) return ''; const T = TYPES[it.type];
+    return sheet(`<div class="flex items-center justify-between"><h2 class="text-[22px] font-black">模块设置</h2><span class="rounded-full bg-panel2 px-3 py-1 text-[12px] text-white/50">${T.name}</span></div>
+    <label class="mt-5 block text-[12px] font-medium text-white/40">名称</label>
+    <input data-cfg="title" value="${esc(it.title)}" maxlength="10" class="${INPUT} mt-2">
+    ${it.type==='count'?`<label class="mt-5 block text-[12px] font-medium text-white/40">目标日期</label><input type="date" data-cfg="date" value="${esc(it.d.date)}" class="${INPUT} ${NUM} mt-2 [color-scheme:dark]">`:''}
+    ${it.type==='ledger'?`<label class="mt-5 block text-[12px] font-medium text-white/40">每次记账金额（元）</label><input type="number" inputmode="numeric" min="1" data-cfg="step" value="${+it.d.step||10}" class="${INPUT} ${NUM} mt-2">`:''}
+    ${it.type==='quote'?`<label class="mt-5 block text-[12px] font-medium text-white/40">自定义内容（留空则每日更换）</label><textarea data-cfg="text" rows="3" placeholder="写下你的座右铭" class="${INPUT} mt-2 h-auto resize-none py-3 leading-7">${esc(it.d.text||'')}</textarea>`:''}
+    <div class="mt-5 text-[12px] font-medium text-white/40">颜色</div>
+    <div class="mt-2 flex gap-2.5">${Object.keys(COLORS).map(c=>`<button class="flex size-10 items-center justify-center rounded-full ${c==='graphite'?'ring-1 ring-white/25':''} ${it.color===c?'outline-2 outline-offset-2 outline-white':''}" style="${tint(c)}" data-act="setColor" data-v="${c}" aria-label="${c}">${it.color===c?ic('check','size-4'):''}</button>`).join('')}</div>
+    ${T.sizes.length>1?`<div class="mt-5 text-[12px] font-medium text-white/40">尺寸</div>
+    <div class="mt-2 grid grid-cols-2 gap-1 rounded-2xl bg-panel2 p-1">${[['s','半宽'],['w','整行']].map(([v,n])=>`<button class="h-10 rounded-xl text-[14px] font-bold ${it.size===v?'bg-white text-ink':'text-white/50'}" data-act="setSize" data-v="${v}">${n}</button>`).join('')}</div>`:''}
+    <div class="mt-6 flex gap-3"><button class="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-panel2 text-[15px] font-bold text-pink" data-act="wDel" data-v="${it.k}">${ic('trash','size-4')}删除模块</button>
+      <button class="flex h-14 flex-1 items-center justify-center rounded-2xl bg-lime text-[16px] font-bold text-ink" data-act="closeSheet" data-force>完成</button></div>`); },
+
+  sheet_post: () => sheet(`<h2 class="mb-4 text-[22px] font-black">发帖</h2>
+    <textarea id="postIn" rows="6" placeholder="说点真实的…" class="w-full resize-none rounded-2xl bg-panel2 p-4 text-[16px] leading-7 outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-2 focus:ring-lime"></textarea>
+    <button class="${BTN} mt-4" data-act="sendPost">发布</button>`),
+
+  sheet_demo: () => sheet(`<div class="flex items-center justify-between"><h2 class="text-[22px] font-black">隐藏画像</h2><span class="rounded-full bg-panel2 px-3 py-1 text-[11px] text-white/50">仅原型演示 · 用户不可见</span></div>
+    <div class="mt-4 flex items-end justify-between rounded-3xl p-5" style="${tint(S.score<PASS_LINE?'pink':'lime')}"><div><div class="text-[12px] font-semibold opacity-60">综合积分</div>
+      <div class="${NUM} text-[64px] leading-none">${S.score}</div></div>
+      <div class="text-right text-[12px] font-semibold opacity-60">淘汰线 ${PASS_LINE}<br><span class="text-[16px] opacity-100">${S.score>=PASS_LINE?'高出 '+(S.score-PASS_LINE):'低于 '+(PASS_LINE-S.score)} 分</span></div></div>
+    <div class="mt-3 grid grid-cols-2 gap-3">${[['a','是非分明'],['b','不损害他人'],['c','实事求是'],['d','正直善良']].map(([k,n])=>`<div class="rounded-2xl bg-panel2 p-4"><div class="text-[12px] text-white/50">${n}</div><div class="${NUM} mt-1 text-[24px]">${S.dims[k]}</div>
+      <div class="mt-2 h-1.5 rounded-full bg-white/10"><div class="h-full rounded-full bg-white/70" style="width:${S.dims[k]}%"></div></div></div>`).join('')}</div>
+    <div class="mt-5 text-[12px] font-medium text-white/40">信号记录</div>
+    <div class="mt-1 divide-y divide-white/5">${S.logs.length?S.logs.map(l=>`<div class="flex gap-3 py-3"><span class="${NUM} w-10 shrink-0 text-[16px] ${l.d>0?'text-lime':l.d<0?'text-pink':'text-white/30'}">${l.d>0?'+':''}${l.d}</span>
+      <div class="min-w-0 text-[13px] leading-5"><div><span class="text-white/50">${esc(l.source)}</span> · ${esc(l.why)}</div>${l.text?`<div class="truncate text-white/35">“${esc(l.text)}”</div>`:''}</div></div>`).join(''):'<div class="py-3 text-[13px] text-white/40">暂无</div>'}</div>
+    <p class="mt-3 text-[12px] leading-5 text-white/35">试试在社区或助手对话里输入含"刷单""造谣""骗"的内容，观察扣分与淘汰。</p>`)
+};
+
+/* ---------- 桌面模块（it = 模块实例） ---------- */
+const WT = it => `<div class="truncate text-[13px] font-bold opacity-60">${esc(it.title)}</div>`;
+const W = {
+  quote: it => `${WT(it)}<p class="mt-2 ${it.size==='w'?'text-[19px] leading-8':'text-[16px] leading-7'} font-bold">${esc(it.d.text || QUOTES[new Date().getDate()%QUOTES.length])}</p>`,
+  count: it => { const t = new Date(it.d.date + 'T00:00:00'), d = Math.ceil((t - new Date())/864e5), ok = !isNaN(d);
+    return `<div class="${it.size==='w'?'flex items-end justify-between':''}"><div>${WT(it)}
+      <div class="${NUM} mt-2 text-[52px] leading-none">${ok?Math.abs(d):'—'}<span class="ml-1 font-sans text-[15px] font-bold opacity-60">天</span></div></div>
+      <div class="${NUM} mt-2 text-[13px] font-medium opacity-60">${ok?(d<0?'已过 · ':'距 ')+esc(it.d.date.replace(/-/g,'.')):'请设置日期'}</div></div>`; },
+  habit: it => `<div class="flex h-full ${it.size==='w'?'items-center gap-4':'flex-col'}"><div class="flex-1">${WT(it)}
+      <div class="${NUM} mt-2 text-[52px] leading-none">${it.d.n}<span class="ml-1 font-sans text-[15px] font-bold opacity-60">天</span></div>
+      <div class="mt-3 flex gap-1.5">${[0,1,2,3,4,5,6].map(i=>`<div class="h-2 flex-1 rounded-full bg-current ${i < Math.min(7,it.d.n)?'':'opacity-15'}"></div>`).join('')}</div></div>
+    <button class="${it.size==='w'?'h-12 px-6':'mt-4 h-10'} shrink-0 rounded-full text-[14px] font-bold active:opacity-80" style="${inv(it.color)}" data-act="habit" data-v="${it.k}">打卡</button></div>`,
+  ledger: it => `<div class="flex h-full ${it.size==='w'?'items-center gap-4':'flex-col'}"><div class="flex-1">${WT(it)}
+      <div class="${NUM} mt-2 text-[44px] leading-none"><span class="mr-0.5 text-[20px] opacity-60">¥</span>${it.d.total}</div></div>
+    <button class="${NUM} ${it.size==='w'?'h-12 px-6':'mt-4 h-10'} shrink-0 rounded-full text-[14px] active:opacity-80" style="${inv(it.color)}" data-act="spend" data-v="${it.k}">+ ¥${+it.d.step||10}</button></div>`,
+  todo: it => { const left = it.d.items.filter(t=>!t.d).length; return `<div class="flex items-baseline justify-between">${WT(it)}<span class="${NUM} text-[13px] opacity-60">${it.d.items.length-left}/${it.d.items.length}</span></div>
+    <div class="mt-2">${it.d.items.map((t,i)=>`<button class="flex w-full items-center gap-3 py-2 text-left" data-act="tg" data-v="${it.k},${i}">
+      <span class="flex size-6 shrink-0 items-center justify-center rounded-lg ${t.d?'':'border-2 border-current opacity-30'}" style="${t.d?inv(it.color):''}">${t.d?ic('check','size-4'):''}</span>
+      <span class="text-[15px] font-medium ${t.d?'line-through opacity-40':''}">${esc(t.t)}</span></button>`).join('')}</div>
+    <div class="mt-2 flex h-11 items-center gap-2 rounded-2xl bg-current/10 pl-4 pr-1"><input data-todo="${it.k}" placeholder="添加一项" class="h-full min-w-0 flex-1 bg-transparent text-[14px] font-medium outline-none placeholder:text-current placeholder:opacity-40">
+      <button class="flex size-9 items-center justify-center rounded-xl" style="${inv(it.color)}" data-act="addTodo" data-v="${it.k}">${ic('plus','size-4')}</button></div>`; },
+  note: it => `${WT(it)}<textarea data-note="${it.k}" rows="3" placeholder="写点什么…" class="mt-2 w-full resize-none bg-transparent text-[15px] font-medium leading-7 outline-none placeholder:text-current placeholder:opacity-40">${esc(it.d.text||'')}</textarea>`,
+  hot: it => `${WT(it)}<div class="mt-1">${S.posts.slice().sort((a,b)=>b.likes-a.likes).slice(0,3).map((p,i)=>`<button class="flex w-full items-center gap-3 py-2 text-left" data-act="tab" data-v="community">
+      <span class="${NUM} w-4 text-[16px] ${i?'opacity-30':''}">${i+1}</span><span class="min-w-0 flex-1 truncate text-[14px] font-medium">${esc(p.text)}</span><span class="${NUM} text-[12px] opacity-50">${p.likes}</span></button>`).join('')}</div>`
+};
+
+function render(){
+  const top = (document.getElementById('deskScroll') || {}).scrollTop || 0;
+  if (S.page >= S.pages.length) S.page = 0;
+  $app.dataset.edit = S.edit && S.stage === 'main' && S.tab === 'home';
+  $app.innerHTML = V[S.stage]() + (S.sheet ? V['sheet_'+S.sheet]() : '');
+  animSheet = false;
+  const desk = document.getElementById('deskScroll'); if (desk) desk.scrollTop = top;
+  const c = document.getElementById('chatScroll'); if (c) c.scrollTop = c.scrollHeight;
+  save();
+}
+
+/* ---------- AI 对话（模拟） ---------- */
+function aiReply(text){
+  if (NEG.some(k => text.includes(k))) return {r:'ai', t:'这件事我帮不了，它可能会损害别人的利益。换个方向，我很乐意帮忙。'};
+  const id = Object.keys(TYPES).find(k => TYPES[k].keys.some(w => text.toLowerCase().includes(w)));
+  if (id) return {r:'ai', t:'明白，我为你准备了这个模块：', w:id};
+  return {r:'ai', t:'我在听。可以说得再具体一点，比如"我想要一个记账的模块"。'};
+}
+function sendChat(text){
+  text = text.trim(); if (!text) return;
+  S.chat.push({r:'me', t:text}); judge(text, 'AI 对话');
+  if (S.stage === 'main') S.chat.push(aiReply(text));
+  render();
+}
+
+/* ---------- 事件 ---------- */
+const val = id => (document.getElementById(id) || {value:''}).value.trim();
+const toBottom = () => requestAnimationFrame(() => { const d = document.getElementById('deskScroll'); if (d) d.scrollTo({top:d.scrollHeight, behavior:'smooth'}); });
+const A = {
+  go: v => { S.stage = v; S.err = ''; },
+  agree: () => { S.agree = !S.agree; S.err = ''; },
+  startQuiz: () => {
+    S.err = !/^1\d{10}$/.test(S.phone) ? '请输入正确的 11 位手机号' : S.blocked.includes(S.phone) ? '该手机号已无法申请' : !S.agree ? '请先阅读并同意评估告知' : '';
+    if (!S.err) { S.stage = 'quiz'; S.qi = 0; S.answers = []; }
+  },
+  pick: v => { S.answers[S.qi] = +v; },
+  next: () => {
+    const q = QUIZ[S.qi];
+    if (q.type === 'open') { const t = val('open'); if (t.length < 8) return false; S.answers[S.qi] = t; }
+    else if (S.answers[S.qi] == null) return false;
+    if (S.qi < QUIZ.length - 1) { S.qi++; return; }
+    S.stage = 'judging';
+    setTimeout(() => {
+      const raw = QUIZ.reduce((s,q,i)=> s + (q.type==='choice' ? q.opts[S.answers[i]][1] : scoreOpen(S.answers[i])), 0);
+      S.score = Math.round(raw / (QUIZ.length*4) * 100);
+      S.dims = {a:S.score, b:S.score, c:S.score, d:S.score};
+      S.logs = [{d:S.score, source:'注册问答', why:`初始分（原始 ${raw}/${QUIZ.length*4}）`, text:''}];
+      if (S.score < PASS_LINE) { S.stage = 'rejected'; S.blocked.push(S.phone); } else { S.stage = 'main'; S.tab = 'home'; }
+      render();
+    }, 1600);
+  },
+  tab: v => { S.tab = v; S.edit = false; S.openCmt = null; },
+  edit: () => { S.edit = !S.edit; },
+  sheet: v => { S.sheet = v; animSheet = true; },
+  closeSheet: () => { S.sheet = null; S.cfgK = null; },
+  /* 桌面：页面 */
+  page: v => { S.page = +v; },
+  addPage: () => { S.pages.push({name:'新页面', items:[]}); S.page = S.pages.length - 1; S.edit = true; },
+  delPage: () => { if (S.pages.length < 2 || !confirm(`删除页面「${page().name}」及其中的模块？`)) return false; S.pages.splice(S.page, 1); S.page = Math.max(0, S.page - 1); },
+  /* 桌面：模块 */
+  add: v => { page().items.push(mk(v)); toBottom(); },
+  wDel: v => { for (const p of S.pages) p.items = p.items.filter(i => i.k !== v); S.sheet = null; S.cfgK = null; },
+  wSize: v => { const it = item(v), s = TYPES[it.type].sizes; it.size = s[(s.indexOf(it.size) + 1) % s.length]; },
+  wColor: v => { const it = item(v), c = Object.keys(COLORS); it.color = c[(c.indexOf(it.color) + 1) % c.length]; },
+  wCfg: v => { S.cfgK = v; S.sheet = 'cfg'; animSheet = true; },
+  setColor: v => { item(S.cfgK).color = v; },
+  setSize: v => { item(S.cfgK).size = v; },
+  addW: v => { const [t,i] = v.split(','); page().items.push(mk(t)); S.chat[+i].done = true; S.chat.push({r:'ai', t:`已添加到「${page().name}」页，返回桌面就能看到。长按它可以改名称、颜色和大小。`}); },
+  tg: v => { const [k,i] = v.split(','), t = item(k).d.items[+i]; t.d = !t.d; },
+  addTodo: v => { const el = $app.querySelector(`[data-todo="${v}"]`), t = el ? el.value.trim() : ''; if (!t) return false; item(v).d.items.push({t, d:false}); },
+  habit: v => { item(v).d.n++; }, spend: v => { const it = item(v); it.d.total += +it.d.step || 10; },
+  like: v => { const p = S.posts.find(p=>p.id==v); p.liked = !p.liked; p.likes += p.liked?1:-1; },
+  cmt: v => { S.openCmt = S.openCmt==v ? null : +v; },
+  sendCmt: v => { const t = val('cmtIn'); if (!t) return false; S.posts.find(p=>p.id==v).cmts.push({name:S.name, text:t}); S.openCmt = null; judge(t, '社区评论'); },
+  sendPost: () => { const t = val('postIn'); if (!t) return false; S.posts.unshift({id:Date.now(), name:S.name, text:t, likes:0, liked:false, cmts:[], mine:true}); S.sheet = null; judge(t, '社区发帖'); },
+  send: () => { sendChat(val('chatIn')); return false; },
+  chip: v => { sendChat(v); return false; },
+  reset: () => { if (!confirm('清空所有演示数据并回到注册页？')) return false; localStorage.removeItem(KEY); S = fresh(); }
+};
+
+/* ---------- 桌面编辑：长按进入、拖动排序 ---------- */
+let press = null, drag = null, swallowClick = false;
+const onDesk = () => S.stage === 'main' && S.tab === 'home' && !S.sheet;
+$app.addEventListener('pointerdown', e => {
+  if (!onDesk() || e.button || drag) return;
+  const w = e.target.closest('[data-wid]');
+  if (!w || (S.edit && e.target.closest('[data-act]'))) return;
+  if (!S.edit && e.target.closest('input,textarea')) return;
+  const hold = !S.edit ? 450 : e.pointerType === 'mouse' ? 0 : 160;
+  clearTimeout(press && press.t);
+  press = {w, id:e.pointerId, x:e.clientX, y:e.clientY, t:setTimeout(startDrag, hold)};
+});
+function startDrag(){
+  const p = press; press = null; if (!p || !p.w.isConnected) return;
+  if (!S.edit) { S.edit = true; $app.dataset.edit = true; save(); if (navigator.vibrate) navigator.vibrate(12); }
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const r = p.w.getBoundingClientRect();
+  drag = {el:p.w, gx:p.x - r.left, gy:p.y - r.top, px:p.x, py:p.y, last:null, lastT:0};
+  p.w.classList.add('dragging');
+  requestAnimationFrame(dragFrame);
+}
+function dragFrame(){
+  if (!drag) return;
+  const {el} = drag, grid = el.parentNode, sc = document.getElementById('deskScroll'), box = sc.getBoundingClientRect();
+  if (drag.py < box.top + 50) sc.scrollTop -= 9; else if (drag.py > box.bottom - 210) sc.scrollTop += 9;
+  const g = grid.getBoundingClientRect();
+  el.style.transform = `translate(${drag.px - drag.gx - g.left - el.offsetLeft}px,${drag.py - drag.gy - g.top - el.offsetTop}px) scale(1.04)`;
+  const hit = document.elementFromPoint(drag.px, drag.py), t = hit && hit.closest('[data-wid]'), now = Date.now();
+  if (t && t !== el && !(t === drag.last && now - drag.lastT < 350)) {
+    const others = [...grid.children].filter(c => c !== el), before = others.map(c => c.getBoundingClientRect());
+    if (el.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) t.after(el); else t.before(el);
+    others.forEach((c, i) => { const a = c.getBoundingClientRect(), dx = before[i].left - a.left, dy = before[i].top - a.top;
+      if (!dx && !dy) return;
+      c.style.transition = 'none'; c.style.transform = `translate(${dx}px,${dy}px)`; c.offsetWidth;
+      c.style.transition = 'transform .24s cubic-bezier(.2,.8,.2,1)'; c.style.transform = ''; });
+    drag.last = t; drag.lastT = now;
+  }
+  requestAnimationFrame(dragFrame);
+}
+addEventListener('pointermove', e => {
+  if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) { clearTimeout(press.t); press = null; }
+  if (drag) { drag.px = e.clientX; drag.py = e.clientY; }
+});
+function endDrag(){
+  if (press) { clearTimeout(press.t); press = null; }
+  if (!drag) return;
+  const {el} = drag; drag = null;
+  el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; el.style.transform = '';
+  setTimeout(() => { el.classList.remove('dragging'); el.style.transition = ''; }, 200);
+  const order = [...el.parentNode.querySelectorAll('[data-wid]')].map(c => c.dataset.wid), p = page();
+  p.items.sort((a, b) => order.indexOf(a.k) - order.indexOf(b.k)); save();
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
+}
+addEventListener('pointerup', endDrag);
+addEventListener('pointercancel', endDrag);
+document.addEventListener('touchmove', e => { if (drag && e.cancelable) e.preventDefault(); }, {passive:false});
+$app.addEventListener('contextmenu', e => { if (e.target.closest('[data-wid]')) e.preventDefault(); });
+$app.addEventListener('click', e => {
+  if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); return; }
+  if (S.edit && onDesk() && e.target.hasAttribute('data-blank')) { S.edit = false; render(); }
+}, true);
+
+$app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  if (el.dataset.act === 'closeSheet' && !el.hasAttribute('data-force') && e.target.closest('[data-stop]')) return;
+  if (A[el.dataset.act](el.dataset.v) !== false) render();
+});
+$app.addEventListener('input', e => {
+  const t = e.target, d = t.dataset;
+  if (t.id === 'phone') S.phone = t.value.trim();
+  if (t.id === 'nameIn') S.name = t.value || '新同志';
+  if (t.id === 'pageName') { page().name = t.value || '未命名'; const c = document.getElementById('pageChip'); if (c) c.textContent = page().name; }
+  if (d.note) item(d.note).d.text = t.value;
+  if (d.cfg) { const it = item(S.cfgK); if (d.cfg === 'title') it.title = t.value || TYPES[it.type].name; else it.d[d.cfg] = d.cfg === 'step' ? Math.max(1, +t.value || 10) : t.value; }
+  save();
+});
+$app.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  const t = e.target;
+  if (t.id === 'chatIn') sendChat(t.value);
+  if (t.dataset.todo && A.addTodo(t.dataset.todo) !== false) render();
+  if (t.id === 'cmtIn' && A.sendCmt(S.openCmt) !== false) render();
+  if (t.id === 'pageName' || t.dataset.cfg === 'title') t.blur();
+});
+if (S.stage === 'judging') S.stage = 'quiz';
+render();
+</script>
+</body>
+</html>
