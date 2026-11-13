@@ -5,9 +5,11 @@
     "build": "node build.mjs"
   },
   "devDependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
     "@fontsource-variable/outfit": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/league-gothic": "^5.3.0",
     "@fontsource/noto-sans-sc": "^5.3.1",
     "@fontsource/noto-serif-sc": "^5.3.1",

@@ -27,6 +27,17 @@ const latinFace = (family, weight, file) =>
   writeFileSync(here('v3.html'), html.replace('/*__CSS__*/', () => css));
   console.log('built v3.html', (css.length / 1024).toFixed(1) + 'KB css');
 }
+{
+  const dir = 'src/v4/';
+  const css = readFileSync(here(dir + 'app.css'), 'utf8')
+    .replace(/@import url\("\.\/([\w.-]+)"\);/g, (_, f) => readFileSync(here(dir + f), 'utf8').trim())
+    + latinFace('Hanken Grotesk', '100 900', 'node_modules/@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2')
+    + latinFace('Geist Mono', '400', 'node_modules/@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2');
+  const html = readFileSync(here(dir + 'app.html'), 'utf8');
+  if (!html.includes('/*__CSS__*/')) throw new Error('CSS placeholder missing in v4');
+  writeFileSync(here('v4.html'), html.replace('/*__CSS__*/', () => css));
+  console.log('built v4.html', (css.length / 1024).toFixed(1) + 'KB css');
+}
 for (const v of versions) {
   execFileSync('npx', ['tailwindcss', '-i', v.css, '-o', 'dist.css', '--minify'], { cwd: here('.'), stdio: 'ignore' });
   const css = readFileSync(here('dist.css'), 'utf8');
