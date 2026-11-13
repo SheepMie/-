@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light;
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.44rem; --text-2xl: 1.728rem; --text-3xl: 2.074rem;
+  --text-display-s: 1.44rem; --text-display: 1.728rem; --text-section: 1.2rem; --text-title: 1rem; --text-lead: 1rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  --color-error: oklch(44% 0.17 25); --color-success: oklch(50% 0.12 150);
+  --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
+  --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+  /* 泛黄的书页、赭墨、朱批、皮面与烫金 */
+  --color-paper: oklch(88% 0.055 88); --color-paper-2: oklch(84% 0.06 86); --color-paper-3: oklch(78% 0.07 82);
+  --color-ink: oklch(25% 0.04 48); --color-ink-2: oklch(36% 0.05 45); --color-muted: oklch(42% 0.05 58);
+  --color-rule: oklch(68% 0.07 76); --color-rule-2: oklch(56% 0.07 68);
+  --color-accent: oklch(46% 0.16 28); --color-accent-ink: oklch(90% 0.05 88); --color-accent-2: oklch(46% 0.16 28); --color-focus: oklch(46% 0.16 28);
+  --color-cotton: oklch(90% 0.052 90); --color-desk: oklch(83% 0.066 84); --color-print: oklch(25% 0.04 48);
+  --color-board: oklch(26% 0.05 32); --color-board-2: oklch(21% 0.045 30); --color-board-type: oklch(82% 0.11 86); --color-paid: oklch(46% 0.16 28);
+  --tex-cotton: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.05' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.3 0 0 0 0 0.12 0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E"); --tex-desk: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.02' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0 0.08 0 0 0 0.3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  --tex-leather: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  --shade: 30% 0.06 50; --lit: 96% 0.04 92; --deep: 12% 0.03 40;
+  --font-display: "Grenze Gotisch", "Noto Serif SC", "Songti SC", "STSong", serif; --font-body: "Newsreader", "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
+  --font-outlier: var(--font-body);
+  --radius-card: 2px; --radius-input: 2px; --radius-pill: 999px; --radius-stock: 2px; --rule-hair: 1px;
+  --shadow-card: 0 1px 2px oklch(var(--shade) / 0.2);
+  /* 双线边框：外一道墨线，内一道细线 */
+  --edge-stock: 0 0 0 1px var(--color-rule-2), inset 0 0 0 3px var(--color-cotton), inset 0 0 0 4px var(--color-rule);
+  --cast-stock: 0 3px 8px -3px oklch(var(--shade) / 0.45); --cast-stock-lift: 0 10px 20px -6px oklch(var(--shade) / 0.5);
+  --press-groove: inset 0 0 0 1px var(--color-rule-2), inset 0 2px 4px oklch(var(--shade) / 0.22);
+  --gilt-frame: inset 0 0 0 1px var(--color-board-type), inset 0 0 0 4px var(--color-board), inset 0 0 0 5px color-mix(in oklab, var(--color-board-type) 55%, transparent);
+  --tracking-display: 0.02em; --display-weight: 700;
+}

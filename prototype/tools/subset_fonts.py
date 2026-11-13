@@ -6,7 +6,7 @@ built HTML renders the same on any phone.
 Run from prototype/ after `npm install` whenever UI copy changes:
     pip install fonttools brotli
     python3 tools/subset_fonts.py v1     # -> src/fonts.css
-    python3 tools/subset_fonts.py v3     # -> src/v3/fonts.css
+    python3 tools/subset_fonts.py v3     # -> src/v3/fonts.css (v5 likewise)
 """
 import base64, io, re, sys
 from pathlib import Path
@@ -23,6 +23,8 @@ VERSIONS = {
                cjk=[('noto-serif-sc', 400, 'Noto Serif SC', '400'), ('noto-serif-sc', 700, 'Noto Serif SC', '700')]),
     'v3': dict(src='src/v3/app.html', out='src/v3/fonts.css', latin=[],
                cjk=[('noto-sans-sc', 900, 'Noto Sans SC', '400'), ('noto-serif-sc', 500, 'Noto Serif SC', '400 700')]),
+    'v5': dict(src='src/v5/app.html', out='src/v5/fonts.css', latin=[],
+               cjk=[('noto-serif-sc', 500, 'Noto Serif SC', '400 500'), ('noto-serif-sc', 700, 'Noto Serif SC', '600 900')]),
 }
 
 def make(path, codepoints, features):
